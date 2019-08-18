@@ -63,8 +63,34 @@
 
 ## Implement batch jobs by using Azure Batch Services
 
-* manage batch jobs by using Batch Service API
-* run a batch job by using Azure CLI, Azure portal, and other tools
+* manage batch jobs by using [Batch Service API Reference](https://docs.microsoft.com/en-us/rest/api/batchservice/)
+* run a batch job by using [Azure CLI](https://docs.microsoft.com/en-ca/azure/batch/quick-create-cli), [Azure portal](https://docs.microsoft.com/en-ca/azure/batch/quick-create-portal), and other tools ([NET](https://docs.microsoft.com/en-ca/azure/batch/quick-run-dotnet))
+    - CLI
+    ```ps
+    az group create --name marianResourceGroup --location eastus2
+    
+    az storage account create --resource-group marianResourceGroup --name marianstorageaccount --location eastus2 --sku Standard_LRS
+
+    az batch account create --name marianbatchaccount --storage-account marianstorageaccount --resource-group myresourcegroup --location eastus2
+
+    az batch account login --name marianbatchaccount --resource-group marianResourceGroup --shared-key-auth
+
+    az batch pool create --id mypool --vm-size Standard_A1_v2 --target-dedicated-nodes 2 --image canonical:ubuntuserver:16.04-LTS --node-agent-sku-id "batch.node.ubuntu 16.04"
+
+    az batch job create --id myjob --pool-id mypool
+
+    for i in {1..4}
+    do
+    az batch task create --task-id mytask$i --job-id myjob --command-line "/bin/bash -c 'printenv | grep AZ_BATCH; sleep 90s'"
+    done
+
+    az batch task show --job-id myjob --task-id mytask1
+
+    az batch task file list --job-id myjob --task-id mytask1 --output table
+
+    az batch task file download --job-id myjob --task-id mytask1 --file-path stdout.txt --destination ./stdout-task1.txt
+    ```
+    - NET - [Parallel file processing](https://docs.microsoft.com/en-ca/azure/batch/tutorial-parallel-dotnet)
 * write code to run an Azure Batch Services batch job
 
 ## Create containerized solutions
