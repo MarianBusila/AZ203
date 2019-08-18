@@ -71,7 +71,7 @@
     
     az storage account create --resource-group marianResourceGroup --name marianstorageaccount --location eastus2 --sku Standard_LRS
 
-    az batch account create --name marianbatchaccount --storage-account marianstorageaccount --resource-group myresourcegroup --location eastus2
+    az batch account create --name marianbatchaccount --storage-account marianstorageaccount --resource-group marianresourcegroup --location eastus2
 
     az batch account login --name marianbatchaccount --resource-group marianResourceGroup --shared-key-auth
 
