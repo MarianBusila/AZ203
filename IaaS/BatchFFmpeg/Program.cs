@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -82,11 +84,35 @@ namespace BatchFFmpeg
             Stopwatch timer = new Stopwatch();
             timer.Start();
 
+            // Construct the Storage account connection string
+            string storageConnectionString = String.Format("DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}",
+                                StorageAccountName, StorageAccountKey);
+
+            // Retrieve the storage account
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(storageConnectionString);
+
+            // Create the blob client, for use in obtaining references to blob storage containers
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+
+            // Use the blob client to create the containers in blob storage
+            const string inputContainerName = "input";
+            const string outputContainerName = "output";
+
+            await CreateContainerIfNotExistAsync(blobClient, inputContainerName);
+            await CreateContainerIfNotExistAsync(blobClient, outputContainerName);
+
             // Print out timing info
             timer.Stop();
             Console.WriteLine();
             Console.WriteLine("Sample end: {0}", DateTime.Now);
             Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
+        }
+
+        private static async Task CreateContainerIfNotExistAsync(CloudBlobClient blobClient, string containerName)
+        {
+            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            await container.CreateIfNotExistsAsync();
+            Console.WriteLine("Creating container [{0}].", containerName);
         }
     }
 }
