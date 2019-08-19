@@ -7,6 +7,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Azure.Batch.Protocol;
+using Microsoft.Azure.Batch.Auth;
+using Microsoft.Azure.Batch.Common;
 
 namespace BatchFFmpeg
 {
@@ -117,8 +120,19 @@ namespace BatchFFmpeg
             // the tasks will upload their output.
             string outputContainerSasUrl = GetContainerSasUrl(blobClient, outputContainerName, SharedAccessBlobPermissions.Write);
 
-            // Print out timing info
-            timer.Stop();
+            // CREATE BATCH CLIENT / CREATE POOL / CREATE JOB / ADD TASKS
+            // Create a Batch client and authenticate with shared key credentials.
+            // The Batch client allows the app to interact with the Batch service.
+            BatchSharedKeyCredentials sharedKeyCredentials = new BatchSharedKeyCredentials(BatchAccountUrl, BatchAccountName, BatchAccountKey);
+
+            using (BatchClient batchClient = BatchClient.Open(sharedKeyCredentials))
+            {
+                // Create the Batch pool, which contains the compute nodes that execute the tasks.
+                await CreatePoolIfNotExistAsync(batchClient, PoolId);
+            }
+
+                // Print out timing info
+                timer.Stop();
             Console.WriteLine();
             Console.WriteLine("Sample end: {0}", DateTime.Now);
             Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
@@ -184,6 +198,66 @@ namespace BatchFFmpeg
 
             // Return the URL string for the container, including the SAS token
             return string.Format("{0}{1}", container.Uri, sasContainerToken);
+        }
+
+        // BATCH CLIENT OPERATIONS - FUNCTION IMPLEMENTATIONS
+
+        private static async Task CreatePoolIfNotExistAsync(BatchClient batchClient, string poolId)
+        {
+            CloudPool pool = null;
+            try
+            {
+                Console.WriteLine("Creating pool [{0}]...", poolId);
+
+                ImageReference imageReference = new ImageReference(
+                    publisher: "MicrosoftWindowsServer",
+                    offer: "WindowsServer",
+                    sku: "2012-R2-Datacenter-smalldisk",
+                    version: "latest");
+
+                VirtualMachineConfiguration virtualMachineConfiguration =
+                    new VirtualMachineConfiguration(
+                        imageReference: imageReference,
+                        nodeAgentSkuId: "batch.node.windows amd64");
+
+                // Create an unbound pool. No pool is actually created in the Batch service until we call
+                // CloudPool.Commit(). This CloudPool instance is therefore considered "unbound," and we can
+                // modify its properties.
+                pool = batchClient.PoolOperations.CreatePool(
+                    poolId: PoolId,
+                    virtualMachineSize: PoolVMSize,
+                    virtualMachineConfiguration: virtualMachineConfiguration,
+                    targetDedicatedComputeNodes: DedicatedNodeCount,
+                    targetLowPriorityComputeNodes: LowPriorityNodeCount);
+
+                // Specify the application and version to install on the compute nodes
+                // This assumes that a Windows 64-bit zipfile of ffmpeg has been added to Batch account
+                // with Application Id of "ffmpeg" and Version of "3.4".
+                // Download the zipfile https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-3.4-win64-static.zip
+                // to upload as application package
+                pool.ApplicationPackageReferences = new List<ApplicationPackageReference>
+                {
+                    new ApplicationPackageReference
+                    {
+                        ApplicationId = appPackageId,
+                        Version = appPackageVersion
+                    }
+                };
+
+                await pool.CommitAsync();
+            }
+            catch (BatchException be)
+            {
+                // Accept the specific error code PoolExists as that is expected if the pool already exists
+                if (be.RequestInformation?.BatchError?.Code == BatchErrorCodeStrings.PoolExists)
+                {
+                    Console.WriteLine("The pool {0} already existed when we tried to create it", poolId);
+                }
+                else
+                {
+                    throw; // Any other exception is unexpected
+                }
+            }
         }
     }
 }
