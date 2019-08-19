@@ -143,6 +143,27 @@ namespace BatchFFmpeg
                 // Monitor task success or failure, specifying a maximum amount of time to wait for
                 // the tasks to complete.
                 await MonitorTasks(batchClient, JobId, TimeSpan.FromMinutes(30));
+
+                // Delete input container in storage
+                Console.WriteLine("Deleting container [{0}]...", inputContainerName);
+                CloudBlobContainer container = blobClient.GetContainerReference(inputContainerName);
+                await container.DeleteIfExistsAsync();
+
+                // Clean up Batch resources (if the user so chooses)
+                Console.WriteLine();
+                Console.Write("Delete job? [yes] no: ");
+                string response = Console.ReadLine().ToLower();
+                if (response != "n" && response != "no")
+                {
+                    await batchClient.JobOperations.DeleteJobAsync(JobId);
+                }
+
+                Console.Write("Delete pool? [yes] no: ");
+                response = Console.ReadLine().ToLower();
+                if (response != "n" && response != "no")
+                {
+                    await batchClient.PoolOperations.DeletePoolAsync(PoolId);
+                }
             }
 
             // Print out timing info
