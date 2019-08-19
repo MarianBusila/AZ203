@@ -129,6 +129,14 @@ namespace BatchFFmpeg
             {
                 // Create the Batch pool, which contains the compute nodes that execute the tasks.
                 await CreatePoolIfNotExistAsync(batchClient, PoolId);
+
+                // Create the job that runs the tasks.
+                await CreateJobAsync(batchClient, JobId, PoolId);
+
+                // Create a collection of tasks and add them to the Batch job.
+                // Provide a shared access signature for the tasks so that they can upload their output
+                // to the Storage container.
+                await AddTasksAsync(batchClient, JobId, inputFiles, outputContainerSasUrl);
             }
 
                 // Print out timing info
@@ -259,5 +267,57 @@ namespace BatchFFmpeg
                 }
             }
         }
+
+        private static async Task CreateJobAsync(BatchClient batchClient, string jobId, string poolId)
+        {
+            Console.WriteLine("Creating job [{0}]...", jobId);
+
+            CloudJob job = batchClient.JobOperations.CreateJob();
+            job.Id = jobId;
+            job.PoolInformation = new PoolInformation { PoolId = poolId };
+
+            await job.CommitAsync();
+        }
+
+        private static async Task<List<CloudTask>> AddTasksAsync(BatchClient batchClient, string jobId, List<ResourceFile> inputFiles, string outputContainerSasUrl)
+        {
+            Console.WriteLine("Adding {0} tasks to job [{1}]...", inputFiles.Count, jobId);
+            // Create a collection to hold the tasks added to the job:
+            List<CloudTask> tasks = new List<CloudTask>();
+
+            for (int i = 0 ; i < inputFiles.Count ; i++)
+            {
+                // Assign a task ID for each iteration
+                string taskId = String.Format("Task{0}", i);
+
+                // Define task command line to convert the video format from MP4 to MP3 using ffmpeg.
+                // Note that ffmpeg syntax specifies the format as the file extension of the input file
+                // and the output file respectively. In this case inputs are MP4.
+                string appPath = String.Format("%AZ_BATCH_APP_PACKAGE_{0}#{1}%", appPackageId, appPackageVersion);
+                string inputMediaFile = inputFiles[i].FilePath;
+                string outputMediaFile = String.Format("{0}{1}", Path.GetFileNameWithoutExtension(inputMediaFile), ".mp3");
+                string taskCommandLine = String.Format("cmd /c {0}\\ffmpeg-3.4-win64-static\\bin\\ffmpeg.exe -i {1} {2}", appPath, inputMediaFile, outputMediaFile);
+
+                // Create a cloud task (with the task ID and command line) and add it to the task list
+                CloudTask task = new CloudTask(taskId, taskCommandLine);
+                task.ResourceFiles = new List<ResourceFile> { inputFiles[i] };
+
+                // Task output file will be uploaded to the output container in Storage.
+                List<OutputFile> outputFileList = new List<OutputFile>();
+                OutputFileBlobContainerDestination outputContainer = new OutputFileBlobContainerDestination(outputContainerSasUrl);
+                OutputFile outputFile = new OutputFile(outputMediaFile,
+                    new OutputFileDestination(outputContainer),
+                    new OutputFileUploadOptions(OutputFileUploadCondition.TaskSuccess));
+                outputFileList.Add(outputFile);
+                task.OutputFiles = outputFileList;
+                tasks.Add(task);
+            }
+
+            // Call BatchClient.JobOperations.AddTask() to add the tasks as a collection rather than making a
+            // separate call for each. Bulk task submission helps to ensure efficient underlying API
+            // calls to the Batch service. 
+            await batchClient.JobOperations.AddTaskAsync(jobId, tasks);
+        }
+
     }
 }
