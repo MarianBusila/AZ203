@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Azure.Batch;
+using Microsoft.Extensions.Configuration;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -59,10 +61,10 @@ namespace BatchFFmpeg
                 // calls to async methods within the "Main" method of this console application.
                 MainAsync().Wait();
             }
-            catch (AggregateException)
+            catch (AggregateException ex)
             {
                 Console.WriteLine();
-                Console.WriteLine("One or more exceptions occurred.");
+                Console.WriteLine($"One or more exceptions occurred. {ex.Flatten().Message}");
                 Console.WriteLine();
             }
             finally
@@ -101,6 +103,17 @@ namespace BatchFFmpeg
             await CreateContainerIfNotExistAsync(blobClient, inputContainerName);
             await CreateContainerIfNotExistAsync(blobClient, outputContainerName);
 
+            // RESOURCE FILE SETUP
+            string inputPath = Path.Combine(Environment.CurrentDirectory, "InputFiles");
+            List<string> inputFilePaths = new List<string>(Directory.GetFileSystemEntries(inputPath, "*.mp4",
+                                         SearchOption.TopDirectoryOnly));
+
+            // Upload data files.
+            // Upload the data files using UploadResourceFilesToContainer(). This data will be
+            // processed by each of the tasks that are executed on the compute nodes within the pool.
+            List<ResourceFile> inputFiles = await UploadFilesToContainerAsync(blobClient, inputContainerName, inputFilePaths);
+
+
             // Print out timing info
             timer.Stop();
             Console.WriteLine();
@@ -113,6 +126,43 @@ namespace BatchFFmpeg
             CloudBlobContainer container = blobClient.GetContainerReference(containerName);
             await container.CreateIfNotExistsAsync();
             Console.WriteLine("Creating container [{0}].", containerName);
+        }
+
+        private static async Task<List<ResourceFile>> UploadFilesToContainerAsync(CloudBlobClient blobClient, string inputContainerName, List<string> filePaths)
+        {
+            List<ResourceFile> resourceFiles = new List<ResourceFile>();
+
+            foreach (string filePath in filePaths)
+            {
+                resourceFiles.Add(await UploadResourceFileToContainerAsync(blobClient, inputContainerName, filePath));
+            }
+
+            return resourceFiles;
+        }
+
+        private static async Task<ResourceFile> UploadResourceFileToContainerAsync(CloudBlobClient blobClient, string containerName, string filePath)
+        {
+            Console.WriteLine("Uploading file {0} to container [{1}]...", filePath, containerName);
+            string blobName = Path.GetFileName(filePath);
+            var fileStream = File.OpenRead(filePath);
+
+            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            CloudBlockBlob blobData = container.GetBlockBlobReference(blobName);
+            await blobData.UploadFromFileAsync(filePath);
+
+            // Set the expiry time and permissions for the blob shared access signature. In this case, no start time is specified,
+            // so the shared access signature becomes valid immediately
+            SharedAccessBlobPolicy sasConstraints = new SharedAccessBlobPolicy
+            {
+                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(2),
+                Permissions = SharedAccessBlobPermissions.Read
+            };
+
+            // Construct the SAS URL for blob
+            string sasBlobToken = blobData.GetSharedAccessSignature(sasConstraints);
+            string blobSasUri = string.Format("{0}{1}", blobData.Uri, sasBlobToken);
+
+            return ResourceFile.FromUrl(blobSasUri, blobName);
         }
     }
 }
