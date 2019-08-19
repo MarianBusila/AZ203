@@ -113,6 +113,9 @@ namespace BatchFFmpeg
             // processed by each of the tasks that are executed on the compute nodes within the pool.
             List<ResourceFile> inputFiles = await UploadFilesToContainerAsync(blobClient, inputContainerName, inputFilePaths);
 
+            // Obtain a shared access signature that provides write access to the output container to which
+            // the tasks will upload their output.
+            string outputContainerSasUrl = GetContainerSasUrl(blobClient, outputContainerName, SharedAccessBlobPermissions.Write);
 
             // Print out timing info
             timer.Stop();
@@ -154,7 +157,7 @@ namespace BatchFFmpeg
             // so the shared access signature becomes valid immediately
             SharedAccessBlobPolicy sasConstraints = new SharedAccessBlobPolicy
             {
-                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(2),
+                SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddHours(2),
                 Permissions = SharedAccessBlobPermissions.Read
             };
 
@@ -163,6 +166,24 @@ namespace BatchFFmpeg
             string blobSasUri = string.Format("{0}{1}", blobData.Uri, sasBlobToken);
 
             return ResourceFile.FromUrl(blobSasUri, blobName);
+        }
+
+        private static string GetContainerSasUrl(CloudBlobClient blobClient, string containerName, SharedAccessBlobPermissions permissions)
+        {
+            // Set the expiry time and permissions for the container access signature. In this case, no start time is specified,
+            // so the shared access signature becomes valid immediately. Expiration is in 2 hours.
+            SharedAccessBlobPolicy sasConstraints = new SharedAccessBlobPolicy
+            {
+                SharedAccessExpiryTime = DateTimeOffset.UtcNow.AddHours(2),
+                Permissions = permissions
+            };
+
+            // Generate the shared access signature on the container, setting the constraints directly on the signature
+            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            string sasContainerToken = container.GetSharedAccessSignature(sasConstraints);
+
+            // Return the URL string for the container, including the SAS token
+            return string.Format("{0}{1}", container.Uri, sasContainerToken);
         }
     }
 }
