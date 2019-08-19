@@ -10,18 +10,20 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Batch.Protocol;
 using Microsoft.Azure.Batch.Auth;
 using Microsoft.Azure.Batch.Common;
+using System.Linq;
 
 namespace BatchFFmpeg
 {
     class Program
     {
+
         // Batch account credentials
         private static string BatchAccountName;
         private static string BatchAccountKey;
         private static string BatchAccountUrl;
 
         // Storage account credentials
-        private static string StorageAccountName ;
+        private static string StorageAccountName;
         private static string StorageAccountKey;
 
         // Pool and Job constants
@@ -91,7 +93,7 @@ namespace BatchFFmpeg
 
             // Construct the Storage account connection string
             string storageConnectionString = String.Format("DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1}",
-                                StorageAccountName, StorageAccountKey);
+                StorageAccountName, StorageAccountKey);
 
             // Retrieve the storage account
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(storageConnectionString);
@@ -109,7 +111,7 @@ namespace BatchFFmpeg
             // RESOURCE FILE SETUP
             string inputPath = Path.Combine(Environment.CurrentDirectory, "InputFiles");
             List<string> inputFilePaths = new List<string>(Directory.GetFileSystemEntries(inputPath, "*.mp4",
-                                         SearchOption.TopDirectoryOnly));
+                SearchOption.TopDirectoryOnly));
 
             // Upload data files.
             // Upload the data files using UploadResourceFilesToContainer(). This data will be
@@ -137,10 +139,14 @@ namespace BatchFFmpeg
                 // Provide a shared access signature for the tasks so that they can upload their output
                 // to the Storage container.
                 await AddTasksAsync(batchClient, JobId, inputFiles, outputContainerSasUrl);
+
+                // Monitor task success or failure, specifying a maximum amount of time to wait for
+                // the tasks to complete.
+                await MonitorTasks(batchClient, JobId, TimeSpan.FromMinutes(30));
             }
 
-                // Print out timing info
-                timer.Stop();
+            // Print out timing info
+            timer.Stop();
             Console.WriteLine();
             Console.WriteLine("Sample end: {0}", DateTime.Now);
             Console.WriteLine("Elapsed time: {0}", timer.Elapsed);
@@ -317,6 +323,63 @@ namespace BatchFFmpeg
             // separate call for each. Bulk task submission helps to ensure efficient underlying API
             // calls to the Batch service. 
             await batchClient.JobOperations.AddTaskAsync(jobId, tasks);
+
+            return tasks;
+        }
+
+        private static async Task<bool> MonitorTasks(BatchClient batchClient, string jobId, TimeSpan timeout)
+        {
+            bool allTasksSuccessful = true;
+            const string completeMessage = "All tasks reached state Completed.";
+            const string incompleteMessage = "One or more tasks failed to reach the Completed state within the timeout period.";
+            const string successMessage = "Success! All tasks completed successfully. Output files uploaded to output container.";
+            const string failureMessage = "One or more tasks failed.";
+
+            // Obtain the collection of tasks currently managed by the job. 
+            // Use a detail level to specify that only the "id" property of each task should be populated. 
+            // See https://docs.microsoft.com/en-us/azure/batch/batch-efficient-list-queries
+            ODATADetailLevel detail = new ODATADetailLevel(selectClause: "id");
+            List<CloudTask> addedTasks = await batchClient.JobOperations.ListTasks(jobId, detail).ToListAsync();
+
+            Console.WriteLine("Monitoring all tasks for 'Completed' state, timeout in {0}...", timeout.ToString());
+
+            // We use a TaskStateMonitor to monitor the state of our tasks. In this case, we will wait for all tasks to
+            // reach the Completed state.
+
+            TaskStateMonitor taskStateMonitor = batchClient.Utilities.CreateTaskStateMonitor();
+            try
+            {
+                await taskStateMonitor.WhenAll(addedTasks, TaskState.Completed, timeout);
+            }
+            catch (TimeoutException)
+            {
+                await batchClient.JobOperations.TerminateJobAsync(jobId);
+                Console.WriteLine(incompleteMessage);
+                return false;
+            }
+            await batchClient.JobOperations.TerminateJobAsync(jobId);
+            Console.WriteLine(completeMessage);
+
+            // All tasks have reached the "Completed" state, however, this does not guarantee all tasks completed successfully.
+            // Here we further check for any tasks with an execution result of "Failure".
+
+            // Update the detail level to populate only the executionInfo property.
+            detail.SelectClause = "executionInfo";
+            // Filter for tasks with 'Failure' result.
+            detail.FilterClause = "executionInfo/result eq 'Failure'";
+
+            List<CloudTask> failedTasks = await batchClient.JobOperations.ListTasks(jobId, detail).ToListAsync();
+
+            if (failedTasks.Any())
+            {
+                allTasksSuccessful = false;
+                Console.WriteLine(failureMessage);
+            }
+            else
+            {
+                Console.WriteLine(successMessage);
+            }
+            return allTasksSuccessful;
         }
 
     }
