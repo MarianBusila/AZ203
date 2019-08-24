@@ -2,7 +2,7 @@
 
 ## Create Azure App Service Web Apps
 
-* create an Azure App Service Web App
+* create an Azure App Service Web App [NetCore](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-get-started-dotnet)
 * create an Azure App Service background task by using WebJobs
 * enable diagnostics logging
 
