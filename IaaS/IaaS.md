@@ -91,11 +91,111 @@
     az batch task file download --job-id myjob --task-id mytask1 --file-path stdout.txt --destination ./stdout-task1.txt
     ```
     - NET - [Parallel file processing](https://docs.microsoft.com/en-ca/azure/batch/tutorial-parallel-dotnet)
-* write code to run an Azure Batch Services batch job
+
+* write code to run an Azure Batch Services batch job [Github samples](https://github.com/Azure-Samples/azure-batch-samples)
 
 ## Create containerized solutions
 
-* create an Azure Managed Kubernetes Service (AKS) cluster
-* create container images for solutions
-* publish an image to the Azure Container Registry
-* run containers by using Azure Container Instance or AKS
+* create an Azure Managed Kubernetes Service (AKS) cluster ([Azure CLI](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough), [Azure Portal](https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough-portal))
+    - [Kubernetes core concepts](https://docs.microsoft.com/en-us/azure/aks/concepts-clusters-workloads): cluster master, nodes and nodes pools, pods
+    - [Docker core concepts](https://docs.docker.com/engine/docker-overview/): images, containers, volumes, networks, services (for scaling containers)
+    - Create AKS cluster
+    ```sh
+    az group create --name myResourceGroup --location eastus
+    az aks create --resource-group myResourceGroup --name myAKSCluster --node-count 1 --enable-addons monitoring --generate-ssh-keys
+    ```
+    - Connect to the cluster
+    ```sh
+    az aks install-cli
+    az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+    kubectl get nodes
+    ```
+    - Run the application
+    ```sh
+    kubectl apply -f azure-vote-all-in-one-redis.yaml
+    kubectl get service azure-vote-front --watch
+    ```
+* create container images for solutions [ACI Tutorial](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-tutorial-prepare-app)
+    - Azure Container Instances enables deployment of Docker containers onto Azure infrastructure without provisioning any virtual machines or adopting a higher-level service.
+    - Dockerfile
+    ```docker
+    FROM node:8.9.3-alpine
+    RUN mkdir -p /usr/src/app
+    COPY ./app/ /usr/src/app/
+    WORKDIR /usr/src/app
+    RUN npm install
+    CMD node /usr/src/app/index.js
+    ```
+    - Build image & run container
+    ```sh 
+    docker build . -t aci-tutorial-app 
+    docker images
+    docker run -d -p 8080:80 aci-tutorial-app
+    docker ps
+    ```    
+    
+* publish an image to the Azure Container Registry [ACI Tutorial](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-tutorial-prepare-acr)
+    - Azure Container Registry is your private Docker registry in Azure
+    - Create Azure Container Registry
+    ```sh
+    az group create --name myResourceGroup --location eastus
+    az acr create --resource-group myResourceGroup --name myAzureContainerRegistry2019 --sku Basic --admin-enabled true
+    az acr login --name myAzureContainerRegistry2019
+    ```
+    - Tag image with full name of the registry's login server
+    ```sh
+    az acr show --name myAzureContainerRegistry2019 --query loginServer --output table
+    docker tag aci-tutorial-app myazurecontainerregistry2019.azurecr.io/aci-tutorial-app:v1
+    ```
+    - Push image to Azure Container Registry
+    ```sh
+    docker push myazurecontainerregistry2019.azurecr.io/aci-tutorial-app:v1
+    ```
+     - List images in Azure Container Registry
+    ```sh
+    az acr repository list --name myazurecontainerregistry2019 --output table
+    az acr repository show-tags --name myazurecontainerregistry2019 --repository aci-tutorial-app --output table
+    ```
+
+* run containers by using Azure Container Instance or AKS [ACI Tutorial]()
+    - Create and configure an Azure AD service principal with pull permissions to your registry
+    ```sh
+    #!/bin/bash
+
+    # Modify for your environment.
+    # ACR_NAME: The name of your Azure Container Registry
+    # SERVICE_PRINCIPAL_NAME: Must be unique within your AD tenant
+    ACR_NAME=myazurecontainerregistry2019
+    SERVICE_PRINCIPAL_NAME=acr-service-principal
+
+    # Obtain the full registry ID for subsequent command args
+    ACR_REGISTRY_ID=$(az acr show --name $ACR_NAME --query id --output tsv)
+
+    # Create the service principal with rights scoped to the registry.
+    # Default permissions are for docker pull access. Modify the '--role'
+    # argument value as desired:
+    # acrpull:     pull only
+    # acrpush:     push and pull
+    # owner:       push, pull, and assign roles
+    SP_PASSWD=$(az ad sp create-for-rbac --name http://$SERVICE_PRINCIPAL_NAME --scopes $ACR_REGISTRY_ID --role acrpull --query password --output tsv)
+    SP_APP_ID=$(az ad sp show --id http://$SERVICE_PRINCIPAL_NAME --query appId --output tsv)
+
+    # Output the service principal's credentials; use these in your services and
+    # applications to authenticate to the container registry.
+    echo "Service principal ID: $SP_APP_ID"
+    echo "Service principal password: $SP_PASSWD"
+    ```
+    - Deploy container
+    ```sh
+    az container create --resource-group myResourceGroup --name aci-tutorial-app --image myazurecontainerregistry2019.azurecr.io/aci-tutorial-app:v1 --cpu 1 --memory 1 --registry-login-server myazurecontainerregistry2019.azurecr.io --registry-username <service-principal-ID> --registry-password <service-principal-password> --dns-name-label aci-tutorial-app2019 --ports 80
+    ```
+    - Verify deployment progress and application dns
+    ```sh
+    az container show --resource-group myResourceGroup --name aci-tutorial-app --query instanceView.state
+    az container show --resource-group myResourceGroup --name aci-tutorial-app --query ipAddress.fqdn
+    ```
+    - Visit http://aci-tutorial-app2019.eastus.azurecontainer.io/
+    - View logs
+    ```sh
+    az container logs --resource-group myResourceGroup --name aci-tutorial-app
+    ```
