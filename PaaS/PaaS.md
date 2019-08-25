@@ -37,7 +37,8 @@
     az webapp log tail --name todoWebApp201908 --resource-group myResourceGroup
     ```
 
-* create an Azure App Service background task by using WebJobs
+* create an Azure App Service background task by using WebJobs [Get started with WebJobs SDK](https://docs.microsoft.com/en-us/azure/app-service/webjobs-sdk-get-started)
+
 * enable diagnostics logging
 
 ## Create Azure App Service mobile apps
