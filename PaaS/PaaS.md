@@ -38,7 +38,9 @@
     ```
 
 * create an Azure App Service background task by using WebJobs [Get started with WebJobs SDK](https://docs.microsoft.com/en-us/azure/app-service/webjobs-sdk-get-started)
-
+    - web jobs are build as console applications and deployed in an App Service
+    - web jobs can have triggers as azure functions (timer, queue ,etc). They can also be run manually. They can also be long running processes (continuous)
+    
 * enable diagnostics logging
 
 ## Create Azure App Service mobile apps

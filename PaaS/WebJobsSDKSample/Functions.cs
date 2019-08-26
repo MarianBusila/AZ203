@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.WebJobs;
+﻿using System.IO;
+using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 
 namespace WebJobsSDKSample
@@ -6,9 +7,13 @@ namespace WebJobsSDKSample
     public class Functions
     {
 
-        public static void ProcessQueueMessage([QueueTrigger("queue")] string message, ILogger logger)
+        public static void ProcessQueueMessage(
+            [QueueTrigger("queue")] string message, 
+            [Blob("container/{queueTrigger}", FileAccess.Read)] Stream myBlob,
+            ILogger logger)
         {
-            logger.LogInformation(message);
+            logger.LogInformation($"Blob name: {message} \n Size: {myBlob.Length} bytes");
+
         }
     }
 }
