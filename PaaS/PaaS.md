@@ -53,6 +53,23 @@
 ## Create Azure App Service API apps
 
 * create an Azure App Service API app [Tutorial: Host a RESTful API with CORS in Azure App Service](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-rest-api)
+    - open TodoApi solution
+    - create web app in app service plan and deploy the TodoApi
+    ```sh
+    az group create --name myResourceGroup --location eastus
+    az appservice plan create --name myAppServicePlan --resource-group myResourceGroup --sku FREE
+    az webapp create --resource-group myResourceGroup --plan myAppServicePlan --name todoApi201908
+    ``` 
+    - check that swagger UI can be accessed at http://todoapi201908.azurewebsites.net/swagger/index.html
+    - in the site.js file modify the uri to "const uri = "https://todoapi201908.azurewebsites.net/api/todo";"
+    - the local UI will not be able to access the service from Azure due to CORS policy.
+    - enable CORS
+    ```sh
+    az resource update --name web --resource-group myResourceGroup --namespace Microsoft.Web --resource-type config --parent sites/todoapi201908 --set properties.cors.allowedOrigins="['https://localhost:44381']" --api-version 2015-06-01
+    ```
+    - you can use your own CORS utilities instead of App Service CORS for more flexibility. For example, you may want to specify different allowed origins for different routes or methods. Since App Service CORS lets you specify one set of accepted origins for all API routes and methods, you would want to use your own CORS code
+
+
 * create documentation for the API by using open source and other tools
     - documentation can be generated with NSwag (ReDeoc UI) and Swashbuckle
     - Swashbuckle
