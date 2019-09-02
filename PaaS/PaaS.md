@@ -55,6 +55,32 @@
 * create an Azure App Service API app [Tutorial: Host a RESTful API with CORS in Azure App Service](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-rest-api)
 * create documentation for the API by using open source and other tools
     - documentation can be generated with NSwag (ReDeoc UI) and Swashbuckle
+    - Swashbuckle
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Register the Swagger generator, defining 1 or more Swagger documents
+        services.AddSwaggerGen(c =>
+        {
+            c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+        });
+    }
+
+    public void Configure(IApplicationBuilder app)
+    {
+        // Enable middleware to serve generated Swagger as a JSON endpoint.
+        app.UseSwagger();
+
+        // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.),
+        // specifying the Swagger JSON endpoint.
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+        });
+    }
+    ```
+    - Swagger doc can be accessed at: http://localhost:port/swagger/v1/swagger.json
+    - Swagger UI can be accessed at: http://localhost:port/swagger
 
 ## Implement Azure functions
 
