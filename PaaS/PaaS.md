@@ -40,10 +40,11 @@
 * create an Azure App Service background task by using WebJobs [Get started with WebJobs SDK](https://docs.microsoft.com/en-us/azure/app-service/webjobs-sdk-get-started)
     - web jobs are build as console applications and deployed in an App Service
     - web jobs can have triggers as azure functions (timer, queue ,etc). They can also be run manually. They can also be long running processes (continuous)
-    
-* enable diagnostics logging
+    - you can publish multiple web jobs to a single web app.
 
-## Create Azure App Service mobile apps
+* enable diagnostics logging [Azure App Service diagnostics overview](https://docs.microsoft.com/en-us/azure/app-service/overview-diagnostics)
+
+## Create Azure App Service mobile apps (TODO)
 
 * add push notifications for mobile apps
 * enable offline sync for mobile app
@@ -51,8 +52,9 @@
 
 ## Create Azure App Service API apps
 
-* create an Azure App Service API app
+* create an Azure App Service API app [Tutorial: Host a RESTful API with CORS in Azure App Service](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-rest-api)
 * create documentation for the API by using open source and other tools
+    - documentation can be generated with NSwag (ReDeoc UI) and Swashbuckle
 
 ## Implement Azure functions
 
