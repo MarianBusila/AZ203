@@ -351,3 +351,4 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 IaaS/BatchFFmpeg/appsettings.local.json
+Storage/TableCRUD/settings.local.json

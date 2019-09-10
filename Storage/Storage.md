@@ -25,7 +25,14 @@
     - if you have a logical set of parameters that are similar each time, using a Stored Access Policy is a better idea. This SAP can server as a basis for the SAS URI you create
 
 * query table storage by using code [.NET](https://docs.microsoft.com/en-ca/azure/cosmos-db/tutorial-develop-table-dotnet?toc=%2Fen-us%2Fazure%2Fstorage%2Ftables%2FTOC.json&bc=%2Fen-us%2Fazure%2Fbread%2Ftoc.json)
+    ```cs
+    using Microsoft.Azure.Storage;
+    using Microsoft.Azure.CosmosDB.Table;
 
+    var connectionString = "DefaultEndpointsProtocol=https;AccountName=table201909;AccountKey=********;TableEndpoint=https://table201909.table.cosmos.azure.com:443/;";
+    CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
+    CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+    ```
 * implement partitioning schemes
 
 ## Develop solutions that use Cosmos DB storage
