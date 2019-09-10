@@ -32,6 +32,11 @@
     var connectionString = "DefaultEndpointsProtocol=https;AccountName=table201909;AccountKey=********;TableEndpoint=https://table201909.table.cosmos.azure.com:443/;";
     CloudStorageAccount storageAccount = CloudStorageAccount.Parse(connectionString);
     CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+    CloudTable table = tableClient.GetTableReference(tableName);
+
+    // insert or merge
+    TableOperation insertOrMergeOperation = TableOperation.InsertOrMerge(entity);
+    TableResult result = await table.ExecuteAsync(insertOrMergeOperation);
     ```
 * implement partitioning schemes
 
