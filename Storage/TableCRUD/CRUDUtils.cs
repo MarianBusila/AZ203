@@ -36,5 +36,33 @@ namespace TableCRUD
                 throw;
             }
         }
+
+        public static async Task<CustomerEntity> RetrieveEntityUsingPointQueryAsync(CloudTable table, string partitionKey, string rowKey)
+        {
+            try
+            {
+                TableOperation retrieveOperation = TableOperation.Retrieve<CustomerEntity>(partitionKey, rowKey);
+                TableResult result = await table.ExecuteAsync(retrieveOperation);
+                CustomerEntity customer = result.Result as CustomerEntity;
+                if (customer != null)
+                {
+                    Console.WriteLine("\t{0}\t{1}\t{2}\t{3}", customer.PartitionKey, customer.RowKey, customer.Email, customer.PhoneNumber);
+                }
+
+                // Get the request units consumed by the current operation. RequestCharge of a TableResult is only applied to Azure CosmoS DB 
+                if (result.RequestCharge.HasValue)
+                {
+                    Console.WriteLine("Request Charge of Retrieve Operation: " + result.RequestCharge);
+                }
+
+                return customer;
+            }
+            catch (StorageException e)
+            {
+                Console.WriteLine(e.Message);
+                Console.ReadLine();
+                throw;
+            }
+        }
     }
 }

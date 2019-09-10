@@ -48,6 +48,11 @@ namespace TableCRUD
             customer.PhoneNumber = "425-555-0105";
             await CRUDUtils.InsertOrMergeEntityAsync(table, customer);
             Console.WriteLine();
+
+            // Demonstrate how to Read the updated entity using a point query 
+            Console.WriteLine("Reading the updated Entity.");
+            customer = await CRUDUtils.RetrieveEntityUsingPointQueryAsync(table, "Harp", "Walter");
+            Console.WriteLine();
         }
     }
 }

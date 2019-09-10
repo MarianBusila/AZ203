@@ -37,6 +37,12 @@
     // insert or merge
     TableOperation insertOrMergeOperation = TableOperation.InsertOrMerge(entity);
     TableResult result = await table.ExecuteAsync(insertOrMergeOperation);
+
+    // retrieve
+    TableOperation retrieveOperation = TableOperation.Retrieve<CustomerEntity>(partitionKey, rowKey);
+    TableResult result = await table.ExecuteAsync(retrieveOperation);
+
+    
     ```
 * implement partitioning schemes
 
