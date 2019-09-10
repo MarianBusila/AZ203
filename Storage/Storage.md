@@ -42,7 +42,9 @@
     TableOperation retrieveOperation = TableOperation.Retrieve<CustomerEntity>(partitionKey, rowKey);
     TableResult result = await table.ExecuteAsync(retrieveOperation);
 
-    
+    // delete
+    TableOperation deleteOperation = TableOperation.Delete(deleteEntity);
+    TableResult result = await table.ExecuteAsync(deleteOperation);    
     ```
 * implement partitioning schemes
 

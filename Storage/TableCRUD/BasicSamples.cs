@@ -14,7 +14,7 @@ namespace TableCRUD
             Console.WriteLine("Azure Cosmos DB Table - Basic Samples\n");
             Console.WriteLine();
 
-            string tableName = "demo" + Guid.NewGuid().ToString().Substring(0, 5);
+            string tableName = "customers";
 
             // create or reference an existing table
             CloudTable table = await Common.CreateTableAsync(tableName);
@@ -27,7 +27,7 @@ namespace TableCRUD
             finally
             {
                 // Delete the table
-                // await table.DeleteIfExistsAsync();
+                await table.DeleteIfExistsAsync();
             }
         }
 
@@ -52,6 +52,11 @@ namespace TableCRUD
             // Demonstrate how to Read the updated entity using a point query 
             Console.WriteLine("Reading the updated Entity.");
             customer = await CRUDUtils.RetrieveEntityUsingPointQueryAsync(table, "Harp", "Walter");
+            Console.WriteLine();
+
+            // Demonstrate how to Delete an entity
+            Console.WriteLine("Delete the entity. ");
+            await CRUDUtils.DeleteEntityAsync(table, customer);
             Console.WriteLine();
         }
     }

@@ -64,5 +64,32 @@ namespace TableCRUD
                 throw;
             }
         }
+
+        public static async Task DeleteEntityAsync(CloudTable table, CustomerEntity deleteEntity)
+        {
+            try
+            {
+                if (deleteEntity == null)
+                {
+                    throw new ArgumentNullException("deleteEntity");
+                }
+
+                TableOperation deleteOperation = TableOperation.Delete(deleteEntity);
+                TableResult result = await table.ExecuteAsync(deleteOperation);
+
+                // Get the request units consumed by the current operation. RequestCharge of a TableResult is only applied to Azure CosmoS DB 
+                if (result.RequestCharge.HasValue)
+                {
+                    Console.WriteLine("Request Charge of Delete Operation: " + result.RequestCharge);
+                }
+
+            }
+            catch (StorageException e)
+            {
+                Console.WriteLine(e.Message);
+                Console.ReadLine();
+                throw;
+            }
+        }
     }
 }
