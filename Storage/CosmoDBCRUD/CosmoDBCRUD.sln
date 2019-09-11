@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29123.88
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CosmoDBCRUD", "CosmoDBCRUD.csproj", "{1555593A-1A42-4987-B222-64635874374E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1555593A-1A42-4987-B222-64635874374E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1555593A-1A42-4987-B222-64635874374E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1555593A-1A42-4987-B222-64635874374E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1555593A-1A42-4987-B222-64635874374E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C737E5EF-8FFC-47A2-B02B-F83A39FBAAD9}
+	EndGlobalSection
+EndGlobal

@@ -44,13 +44,46 @@
 
     // delete
     TableOperation deleteOperation = TableOperation.Delete(deleteEntity);
-    TableResult result = await table.ExecuteAsync(deleteOperation);    
+    TableResult result = await table.ExecuteAsync(deleteOperation);
+
+    // query
+    TableQuery<CustomerEntity> query = new TableQuery<CustomerEntity>()
+    .Where(
+        TableQuery.CombineFilters(
+            TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, "Smith"),
+            TableOperators.And,
+            TableQuery.GenerateFilterCondition("Email", QueryComparisons.Equal,"Ben@contoso.com")
+    ));
+
+    await table.ExecuteQuerySegmentedAsync<CustomerEntity>(query, null);
     ```
 * implement partitioning schemes
+    - in general there are 3 strategies for partitioning data
+        - **Horizontal** (sharding). Each partition is known as a shard and holds a specific subset of the data, such as all the orders for a specific set of customers.
+        - **Vertical**. Each partition holds a subset of the fields for items in the data store. The fields are divided according to their pattern of use. For example, frequently accessed fields might be placed in one vertical partition and less frequently accessed fields in another.
+        - **Functional partitioning**. In this strategy, data is aggregated according to how it is used by each bounded context in the system. For example, an e-commerce system might store invoice data in one partition and product inventory data in another.
 
 ## Develop solutions that use Cosmos DB storage
+* create, read, update, and delete data by using appropriate APIs [.NET](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-get-started)
+    - *Request Units* per second is a rate-based currency. It abstracts the system resources such as CPU, IOPS, and memory that are required to perform the database operations supported by Azure Cosmos DB
+    ```cs
+    this.cosmosClient = new CosmosClient(EndpointUri, PrimaryKey);
+    this.database = await this.cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId);
+    this.container = await this.database.CreateContainerIfNotExistsAsync(containerId, "/LastName");
 
-* create, read, update, and delete data by using appropriate APIs
+    // insert item to container
+    try
+    {
+        ItemResponse<Family> andersenFamilyResponse = await this.container.ReadItemAsync<Family>(andersenFamily.Id, new PartitionKey(andersenFamily.LastName));
+    }
+    catch(CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+    {
+        ItemResponse<Family> andersenFamilyResponse = await this.container.CreateItemAsync<Family>(andersenFamily, new PartitionKey(andersenFamily.LastName));
+        
+        Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", andersenFamilyResponse.Resource.Id, andersenFamilyResponse.RequestCharge);
+    }
+
+    ```
 * implement partitioning schemes
 * set the appropriate consistency level for operations
 
