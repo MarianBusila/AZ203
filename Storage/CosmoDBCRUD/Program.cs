@@ -1,5 +1,6 @@
 ﻿using Microsoft.Azure.Cosmos;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -65,6 +66,18 @@ namespace CosmoDBCRUD
 
             // Add items to container
             await AddItemsToContainerAsync();
+
+            // Query items
+            await QueryItemsAsync();
+
+            // replace item
+            await ReplaceFamilyItemAsync();
+
+            // delete item
+            await DeleteFamilyItemAsync();
+
+            // delete database
+            // await DeleteDatabaseAndCleanupAsync();
         }
 
         private async Task AddItemsToContainerAsync()
@@ -160,6 +173,60 @@ namespace CosmoDBCRUD
                 // Note that after creating the item, we can access the body of the item with the Resource property off the ItemResponse. We can also access the RequestCharge property to see the amount of RUs consumed on this request.
                 Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", wakefieldFamilyResponse.Resource.Id, wakefieldFamilyResponse.RequestCharge);
             }
+        }
+
+        private async Task QueryItemsAsync()
+        {
+            var sqlQueryText = "SELECT * FROM c WHERE c.LastName = 'Andersen'";
+            Console.WriteLine("Running query: {0}\n", sqlQueryText);
+
+            QueryDefinition queryDefinition = new QueryDefinition(sqlQueryText);
+            FeedIterator<Family> queryResultSetIterator = this.container.GetItemQueryIterator<Family>(queryDefinition);
+
+            while(queryResultSetIterator.HasMoreResults)
+            {
+                FeedResponse<Family> currentResultSet = await queryResultSetIterator.ReadNextAsync();
+                foreach(Family family in currentResultSet)
+                {
+                    Console.WriteLine("\t Read {0}\n", family);
+                }
+            }
+        }
+
+        private async Task ReplaceFamilyItemAsync()
+        {
+            ItemResponse<Family> wakefieldFamilyResponse = await this.container.ReadItemAsync<Family>("Wakefield.7", new PartitionKey("Wakefield"));
+            var itemBody = wakefieldFamilyResponse.Resource;
+            // update registration status from false to true
+            itemBody.IsRegistered = true;
+            // update grade of child
+            itemBody.Children[0].Grade = 6;
+
+            // replace the item with the updated content
+            wakefieldFamilyResponse = await this.container.ReplaceItemAsync<Family>(itemBody, itemBody.Id, new PartitionKey(itemBody.LastName));
+            Console.WriteLine("Updated Family [{0},{1}].\n \tBody is now: {2}\n", itemBody.LastName, itemBody.Id, wakefieldFamilyResponse.Resource);
+        
+        }
+
+        private async Task DeleteFamilyItemAsync()
+        {
+            var partitionKeyValue = "Wakefield";
+            var familyId = "Wakefield.7";
+
+            // Delete an item. Note we must provide the partition key value and id of the item to delete
+            ItemResponse<Family> wakefieldFamilyResponse = await this.container.DeleteItemAsync<Family>(familyId, new PartitionKey(partitionKeyValue));
+            Console.WriteLine("Deleted Family [{0},{1}]\n", partitionKeyValue, familyId);
+        }
+
+        private async Task DeleteDatabaseAndCleanupAsync()
+        {
+            DatabaseResponse databaseResourceResponse = await this.database.DeleteAsync();
+            // Also valid: await this.cosmosClient.Databases["FamilyDatabase"].DeleteAsync();
+
+            Console.WriteLine("Deleted Database: {0}\n", this.databaseId);
+
+            //Dispose of CosmosClient
+            this.cosmosClient.Dispose();
         }
     }
 }

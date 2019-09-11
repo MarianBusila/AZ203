@@ -83,6 +83,29 @@
         Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", andersenFamilyResponse.Resource.Id, andersenFamilyResponse.RequestCharge);
     }
 
+    // query
+    var sqlQueryText = "SELECT * FROM c WHERE c.LastName = 'Andersen'";    
+    QueryDefinition queryDefinition = new QueryDefinition(sqlQueryText);
+    FeedIterator<Family> queryResultSetIterator = this.container.GetItemQueryIterator<Family>(queryDefinition);
+
+    while(queryResultSetIterator.HasMoreResults)
+    {
+        FeedResponse<Family> currentResultSet = await queryResultSetIterator.ReadNextAsync();
+        foreach(Family family in currentResultSet)
+        {
+            Console.WriteLine("\t Read {0}\n", family);
+        }        
+    }
+
+    // replace
+    wakefieldFamilyResponse = await this.container.ReplaceItemAsync<Family>(itemBody, itemBody.Id, new PartitionKey(itemBody.LastName));
+
+    // delete
+    ItemResponse<Family> wakefieldFamilyResponse = await this.container.DeleteItemAsync<Family>(familyId,new PartitionKey(partitionKeyValue));
+
+    // delete database
+    DatabaseResponse databaseResourceResponse = await this.database.DeleteAsync();
+
     ```
 * implement partitioning schemes
 * set the appropriate consistency level for operations
