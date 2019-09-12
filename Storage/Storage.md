@@ -108,7 +108,13 @@
 
     ```
 * implement partitioning schemes
-* set the appropriate consistency level for operations
+* set the appropriate consistency level for operations [Choose the right consistency level](https://docs.microsoft.com/en-us/azure/cosmos-db/consistency-levels-choosing)
+    - there are tradeoffs between consistency, performance and availability and CosmosDB offers 5 consistency levels
+    - *Strong* consistency - see all previous writes. 
+    - *Bounded Staleness* - see all "old" writes, aka periodic snapshots, continuous consistency. The reads might lag behind writes by at most "K" versions (i.e., "updates") of an item or by "T" time interval
+    - *Session* - see all writes performed by reader
+    - *Consistent Prefix* - see initial sequence of writes. The reader gets a snapshot of the data that existed in a given point in time in the past.
+    - *Eventual* consistency - see subset if previous writes; eventually see all writes. A write performed by a client (in the primary copy of a data center) will eventually be replicated in a remote data center.       
 
 ## Develop solutions that use a relational database
 
