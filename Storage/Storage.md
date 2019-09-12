@@ -107,7 +107,19 @@
     DatabaseResponse databaseResourceResponse = await this.database.DeleteAsync();
 
     ```
-* implement partitioning schemes
+
+* implement partitioning schemes [Partitioning in Azure Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/partitioning-overview), [Data partitioning strategies(by service)](https://docs.microsoft.com/en-us/azure/architecture/best-practices/data-partitioning-strategies#partitioning-cosmos-db)
+    - Azure Cosmos DB transparently and automatically manages the placement of logical partitions on physical partitions to efficiently satisfy the scalability and performance needs of the container.
+    - Azure Cosmos DB uses hash-based partitioning to spread logical partitions across physical partitions
+    - A single logical partition has an upper limit of 10 GB of storage
+    - Pick a partition key that doesn't result in "hot spots" within your application, because of throughput (RU/s) allocated
+    - Choose a partition key that spreads the workload evenly across all partitions and evenly over time. Your choice of partition key should balance the need for efficient partition queries and transactions against the goal of distributing items across multiple partitions to achieve scalability.
+    - Candidates for partition keys might include properties that appear frequently as a filter in your queries. Queries can be efficiently routed by including the partition key in the filter predicate.
+    - Internally, one or more logical partitions are mapped to a physical partition that consists of a set of replicas
+    - Troughput provisioned for a container is divided evenly among physical partitions. A partition key design that doesn't distribute the throughput requests evenly might create "hot" partitions.
+    - Cosmos DB supports programmable items that can all be stored in a collection alongside documents. These include stored procedures, user-defined functions, and triggers (written in JavaScript)
+    - Database queries are scoped to the collection level
+
 * set the appropriate consistency level for operations [Choose the right consistency level](https://docs.microsoft.com/en-us/azure/cosmos-db/consistency-levels-choosing)
     - there are tradeoffs between consistency, performance and availability and CosmosDB offers 5 consistency levels
     - *Strong* consistency - see all previous writes. 
@@ -115,6 +127,33 @@
     - *Session* - see all writes performed by reader
     - *Consistent Prefix* - see initial sequence of writes. The reader gets a snapshot of the data that existed in a given point in time in the past.
     - *Eventual* consistency - see subset if previous writes; eventually see all writes. A write performed by a client (in the primary copy of a data center) will eventually be replicated in a remote data center.       
+
+* generic notes on CosmosDB
+    - provisioned throughput can be set at the database level and will be shared between containers, or at container level
+    - [Indexing](https://docs.microsoft.com/en-us/azure/cosmos-db/index-overview): 
+        - by default, Azure Cosmos DB automatically indexes every property for all items in your container without having to define any schema or configure secondary indexes.. You can customize the indexing behavior by configuring the indexing policy on a container.
+        - Every time an item is stored in a container, its content is projected as a JSON document, then converted into a tree representation
+        - The default indexing policy for newly created containers indexes every property of every item, enforcing *range* indexes for any string or number, and *spatial* indexes for any GeoJSON object of type Point
+        - A custom indexing policy can specify property paths that are explicitly included or excluded from indexing. By optimizing the number of paths that are indexed, you can lower the amount of storage used by your container and improve the latency of write operations
+        - Queries that have an ORDER BY clause with two or more properties require a composite index. You can also define a composite index to improve the performance of many equality and range queries. By default, no composite indexes are defined so you should add composite indexes as needed.
+    - You can set Time to Live (TTL) on selected items in an Azure Cosmos container or for the entire container to gracefully purge those items from the system.
+    - You can specify a unique key constraint on your Azure Cosmos container
+    - [Data modeling in Azure Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/modeling-data)
+        - in relational databases, data is **normalized** to avoid storing redundant data. In NoSQL, all data is **embedded** in a single document.
+        - when to embed
+            - There are contained relationships between entities.
+            - There are one-to-few relationships between entities.
+            - There is embedded data that changes infrequently.
+            - There is embedded data that will not grow without bound.
+            - There is embedded data that is queried frequently together.
+        - having relationships between different documents is possible in CosmosDB, but there is a tradeoff: write operation can be improved, but read will be costly (example of person with a portofolio of stocks). Relational database might be better in this case
+        - when to reference
+            - Representing one-to-many relationships.
+            - Representing many-to-many relationships.
+            - Related data changes frequently.
+            - Referenced data could be unbounded.
+
+
 
 ## Develop solutions that use a relational database
 
