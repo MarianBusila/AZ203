@@ -119,6 +119,7 @@
     - Troughput provisioned for a container is divided evenly among physical partitions. A partition key design that doesn't distribute the throughput requests evenly might create "hot" partitions.
     - Cosmos DB supports programmable items that can all be stored in a collection alongside documents. These include stored procedures, user-defined functions, and triggers (written in JavaScript)
     - Database queries are scoped to the collection level
+    - Queries with filters on partition key are more efficient
 
 * set the appropriate consistency level for operations [Choose the right consistency level](https://docs.microsoft.com/en-us/azure/cosmos-db/consistency-levels-choosing)
     - there are tradeoffs between consistency, performance and availability and CosmosDB offers 5 consistency levels
@@ -138,8 +139,8 @@
         - Queries that have an ORDER BY clause with two or more properties require a composite index. You can also define a composite index to improve the performance of many equality and range queries. By default, no composite indexes are defined so you should add composite indexes as needed.
     - You can set Time to Live (TTL) on selected items in an Azure Cosmos container or for the entire container to gracefully purge those items from the system.
     - You can specify a unique key constraint on your Azure Cosmos container
-    - [Data modeling in Azure Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/modeling-data)
-        - in relational databases, data is **normalized** to avoid storing redundant data. In NoSQL, all data is **embedded** in a single document.
+    - [Data modeling in Azure Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/modeling-data), [Data modelling and partitioning - a real world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example)
+        - in relational databases, data is **normalized** to avoid storing redundant data. In NoSQL, all data is **embedded / denormalized** in a single document.
         - when to embed
             - There are contained relationships between entities.
             - There are one-to-few relationships between entities.
@@ -152,14 +153,129 @@
             - Representing many-to-many relationships.
             - Related data changes frequently.
             - Referenced data could be unbounded.
+        - data duplication is encoureged to improve read operations
 
 
 
 ## Develop solutions that use a relational database
 
-* provision and configure relational databases
-* configure elastic pools for Azure SQL Database
+* provision and configure relational databases [Quickstart: Create a single database in Azure SQL Database](https://docs.microsoft.com/en-ca/azure/sql-database/sql-database-single-database-get-started?tabs=azure-portal)
+    - Deployment models for Azure sql databases: managed instance, single or elastic pool
+    - Purchasing models:
+        - vCore-based purchasing model lets you choose the number of vCores, the amount of memory, and the amount and speed of storage
+        - DTU-based purchasing model offers a blend of compute, memory, IO resources in three service tiers to support lightweight to heavyweight database workloads
+    - when allocating resources for a single database, you can select compute tier (provisioned, serverless) and compute generation(gen4, gen5) and set the number of vCores and data max size
+    ```sh
+    #!/bin/bash
+    # Set variables
+    subscriptionID=<SubscriptionID>
+    resourceGroupName=myResourceGroup-$RANDOM
+    location=SouthCentralUS
+    adminLogin=azureuser
+    password="PWD27!"+`openssl rand -base64 18`
+    serverName=mysqlserver-$RANDOM
+    databaseName=mySampleDatabase
+    drLocation=NorthEurope
+    drServerName=mysqlsecondary-$RANDOM
+    failoverGroupName=failovergrouptutorial-$RANDOM
+
+    # The ip address range that you want to allow to access your DB. 
+    # Leaving at 0.0.0.0 will prevent outside-of-azure connections to your DB
+    startip=0.0.0.0
+    endip=0.0.0.0
+
+    # Connect to Azure
+    az login
+
+    # Set the subscription context for the Azure account
+    az account set -s $subscriptionID
+
+    # Create a resource group
+    echo "Creating resource group..."
+    az group create \
+    --name $resourceGroupName \
+    --location $location \
+    --tags Owner[=SQLDB-Samples]
+
+    # Create a logical server in the resource group
+    echo "Creating primary logical server..."
+    az sql server create \
+    --name $serverName \
+    --resource-group $resourceGroupName \
+    --location $location  \
+    --admin-user $adminLogin \
+    --admin-password $password
+
+    # Configure a firewall rule for the server
+    echo "Configuring firewall..."
+    az sql server firewall-rule create \
+    --resource-group $resourceGroupName \
+    --server $serverName \
+    -n AllowYourIp \
+    --start-ip-address $startip \
+    --end-ip-address $endip
+
+    # Create a gen5 1vCore database in the server 
+    echo "Creating a gen5 2 vCore database..."
+    az sql db create \
+    --resource-group $resourceGroupName \
+    --server $serverName \
+    --name $databaseName \
+    --sample-name AdventureWorksLT \
+    --edition GeneralPurpose \
+    --family Gen5 \
+    --capacity 2    
+    ```
+
+* configure elastic pools for Azure SQL Database [Manage elastic pools in Azure SQL Database](https://docs.microsoft.com/en-ca/azure/sql-database/sql-database-elastic-pool-manage)
+    - SQL Database elastic pools are a simple, cost-effective solution for managing and scaling multiple databases that have varying and unpredictable usage demands. The databases in an elastic pool are on a single Azure SQL Database server and share a set number of resources at a set price. Elastic pools in Azure SQL Database enable SaaS developers to optimize the price performance for a group of databases within a prescribed budget while delivering performance elasticity for each database
+    - You can configure resources for the pool based either on the DTU-based purchasing model or the vCore-based purchasing model
+    - Pools are well suited for a large number of databases with specific utilization patterns. For a given database, this pattern is characterized by low average utilization with relatively infrequent utilization spikes.
+
+    | Cmdlet | Description |
+    | ----------- | ----------- |
+    | az sql elastic-pool create | Creates an elastic pool |
+    | az sql elastic-pool list | Returns a list of elastic pools in a server |
+    | az sql elastic-pool list-dbs | Returns a list of databases in an elastic pool |
+    | az sql elastic-pool list-editions | Also includes available pool DTU settings, storage limits, and per database settings |
+    | az sql elastic-pool update | Updates an elastic pool |
+    | az sql elastic-pool delete | Deletes the elastic pool |
+
 * create, read, update, and delete data tables by using code
+    - use SQL connection string to connect to database
+    ```cs
+    SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
+
+    builder.DataSource = "<your_server.database.windows.net>"; 
+    builder.UserID = "<your_username>";            
+    builder.Password = "<your_password>";     
+    builder.InitialCatalog = "<your_database>";
+
+    using (SqlConnection connection = new SqlConnection(builder.ConnectionString))
+    {
+        Console.WriteLine("\nQuery data example:");
+        Console.WriteLine("=========================================\n");
+        
+        connection.Open();       
+        StringBuilder sb = new StringBuilder();
+        sb.Append("SELECT TOP 20 pc.Name as CategoryName, p.name as ProductName ");
+        sb.Append("FROM [SalesLT].[ProductCategory] pc ");
+        sb.Append("JOIN [SalesLT].[Product] p ");
+        sb.Append("ON pc.productcategoryid = p.productcategoryid;");
+        String sql = sb.ToString();
+
+        using (SqlCommand command = new SqlCommand(sql, connection))
+        {
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    Console.WriteLine("{0} {1}", reader.GetString(0), reader.GetString(1));
+                }
+            }
+        }
+    }
+    ```
 
 ## Develop solutions that use blob storage
 
