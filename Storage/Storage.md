@@ -504,5 +504,17 @@
     }
     ```
 
-* implement blob leasing
+* implement blob leasing [Azure CLI] (https://docs.microsoft.com/en-us/cli/azure/storage/blob/lease?view=azure-cli-latest), [.NET](https://www.red-gate.com/simple-talk/cloud/platform-as-a-service/azure-blob-storage-part-8-blob-leases/)
+    -  Azure Lease Blob is a mechanism which provides an exclusive lock to the blob storage
+    - you can also put a lease on a container, this gives you exclusive delete access to the container. An important thing to note is that while you hold a lease on a container, it has no effect on the ability to update, add, or delete the blobs in that container.
+
+    | Command | Description |
+    |---------|-------------|
+    | az storage blob lease acquire | Requests a new lease. |
+    | az storage blob lease break | Breaks the lease, if the blob has an active lease. |
+    | az storage blob lease change | Changes the lease ID of an active lease. |
+    | az storage blob lease release | Releases the lease. |
+    | az storage blob lease renew | Renews the lease. |
+
+    - 
 * implement data archiving and retention
