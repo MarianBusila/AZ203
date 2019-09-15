@@ -278,8 +278,231 @@
     ```
 
 ## Develop solutions that use blob storage
+* overview [Advanced C#](https://github.com/Azure-Samples/storage-blob-dotnet-getting-started/blob/master/BlobStorage/Advanced.cs)
+    - blob storage resources: *storage account*, *container*, *blob* (block blobs, append blobs, page blobs)
+    - hierarchical namespace are supported to have a file system like structure using blob storage. Delimiter **/** is used in blob name to model the hierarchy.
+    - access tiers: hot (accessed frequently), cool (infrequently accessed and stored for at least 30 days), archive (rarely accessed and stored for at least 180 days with flexible latency requirements (on the order of hours))
+    - data redundancy:(Locally redundant storage ),Zone-redundant storage (ZRS), Geo-redundant storage (GRS), Read-access geo-redundant storage (RA-GRS), Geo-zone-redundant storage (GZRS), Read-access geo-zone-redundant storage (RA-GZRS)
+    - leases can be aquired on blobs to make sure they are not modified / deleted by other clients
 
-* move items in blob storage between storage accounts or containers
+    - blob quickstart in .NET
+    ```cs
+    // Retrieve storage account information from connection string.
+    CloudStorageAccount storageAccount = CloudStorageAccount.Parse(storageConnectionString);
+
+    // Create the CloudBlobClient that represents the Blob storage endpoint for the storage account.
+    CloudBlobClient cloudBlobClient = storageAccount.CreateCloudBlobClient();
+
+    // Create a container called 'quickstartblobs'
+    CloudBlobContainer cloudBlobContainer = cloudBlobClient.GetContainerReference("quickstartblobs");
+    await cloudBlobContainer.CreateIfNotExistsAsync();
+
+    // Set the permissions so the blobs are public.
+    BlobContainerPermissions permissions = new BlobContainerPermissions
+    {
+        PublicAccess = BlobContainerPublicAccessType.Blob
+    };
+    await cloudBlobContainer.SetPermissionsAsync(permissions);
+
+    // Upload file
+    CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(localFileName);
+    await cloudBlockBlob.UploadFromFileAsync(sourceFile);
+
+    // List the blobs in the container.
+    BlobContinuationToken blobContinuationToken = null;
+    do
+    {
+        var results = await cloudBlobContainer.ListBlobsSegmentedAsync(null, blobContinuationToken);
+        // Get the value of the continuation token returned by the listing call.
+        blobContinuationToken = results.ContinuationToken;
+        foreach (IListBlobItem item in results.Results)
+        {
+            Console.WriteLine(item.Uri);
+        }
+    } while (blobContinuationToken != null); // Loop while the continuation token is not null.
+
+    // Download the blob to a local file
+    await cloudBlockBlob.DownloadToFileAsync(destinationFile, FileMode.Create);
+
+    // Delete container
+     await cloudBlobContainer.DeleteIfExistsAsync();
+    ```
+    - advanced options
+    ```cs
+    // Get current service property settings.
+    ServiceProperties serviceProperties = await blobClient.GetServicePropertiesAsync();
+
+    // Enable analytics logging and set retention policy to 14 days. 
+    serviceProperties.Logging.LoggingOperations = LoggingOperations.All;
+    serviceProperties.Logging.RetentionDays = 14;
+
+     // Acquire the lease.
+    leaseId = await container.AcquireLeaseAsync(leaseDuration, leaseId);
+
+    // delete container will fail if a container is leased, unless the leaseId is provided
+    // container.Properties.LeaseState, container.Properties.LeaseDuration, container.Properties.LeaseStatus
+
+    // Break the lease. Passing null indicates that the break interval will be the remainder of the current lease.
+    await container.BreakLeaseAsync(null);
+
+    // copy blob
+    copyId = await destBlob.StartCopyAsync(sourceBlob);
+
+    //-------------------------------------------------------------------------
+    // Creates a shared access policy on the container.
+    private static async Task CreateSharedAccessPolicyAsync(CloudBlobContainer container, string policyName)
+    {
+        // Create a new shared access policy and define its constraints.
+        // The access policy provides create, write, read, list, and delete permissions.
+        SharedAccessBlobPolicy sharedPolicy = new SharedAccessBlobPolicy()
+        {
+            // When the start time for the SAS is omitted, the start time is assumed to be the time when the storage service receives the request. 
+            // Omitting the start time for a SAS that is effective immediately helps to avoid clock skew.
+            SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
+            Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.List |
+                SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.Create | SharedAccessBlobPermissions.Delete
+        };
+
+        // Get the container's existing permissions.
+        BlobContainerPermissions permissions = await container.GetPermissionsAsync();
+
+        // Add the new policy to the container's permissions, and set the container's permissions.
+        permissions.SharedAccessPolicies.Add(policyName, sharedPolicy);
+        await container.SetPermissionsAsync(permissions);
+    }
+
+    // Returns a URI containing a SAS for the blob container.
+    private static string GetContainerSasUri(CloudBlobContainer container, string storedPolicyName = null)
+    {
+        string sasContainerToken;
+
+        // If no stored policy is specified, create a new access policy and define its constraints.
+        if (storedPolicyName == null)
+        {
+            // Note that the SharedAccessBlobPolicy class is used both to define the parameters of an ad-hoc SAS, and 
+            // to construct a shared access policy that is saved to the container's shared access policies. 
+            SharedAccessBlobPolicy adHocPolicy = new SharedAccessBlobPolicy()
+            {
+                // When the start time for the SAS is omitted, the start time is assumed to be the time when the storage service receives the request. 
+                // Omitting the start time for a SAS that is effective immediately helps to avoid clock skew.
+                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
+                Permissions = SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.List
+            };
+
+            // Generate the shared access signature on the container, setting the constraints directly on the signature.
+            sasContainerToken = container.GetSharedAccessSignature(adHocPolicy, null);
+
+            Console.WriteLine("SAS for blob container (ad hoc): {0}", sasContainerToken);
+            Console.WriteLine();
+        }
+        else
+        {
+            // Generate the shared access signature on the container. In this case, all of the constraints for the
+            // shared access signature are specified on the stored access policy, which is provided by name.
+            // It is also possible to specify some constraints on an ad-hoc SAS and others on the stored access policy.
+            sasContainerToken = container.GetSharedAccessSignature(null, storedPolicyName);
+
+            Console.WriteLine("SAS for blob container (stored access policy): {0}", sasContainerToken);
+            Console.WriteLine();
+        }
+
+        // Return the URI string for the container, including the SAS token.
+        return container.Uri + sasContainerToken;
+    }
+
+    // Returns a URI containing a SAS for the blob.
+    private static string GetBlobSasUri(CloudBlobContainer container, string blobName, string policyName = null)
+    {
+        string sasBlobToken;
+
+        // Get a reference to a blob within the container.
+        // Note that the blob may not exist yet, but a SAS can still be created for it.
+        CloudBlockBlob blob = container.GetBlockBlobReference(blobName);
+
+        if (policyName == null)
+        {
+            // Create a new access policy and define its constraints.
+            // Note that the SharedAccessBlobPolicy class is used both to define the parameters of an ad-hoc SAS, and 
+            // to construct a shared access policy that is saved to the container's shared access policies. 
+            SharedAccessBlobPolicy adHocSAS = new SharedAccessBlobPolicy()
+            {
+                // When the start time for the SAS is omitted, the start time is assumed to be the time when the storage service receives the request. 
+                // Omitting the start time for a SAS that is effective immediately helps to avoid clock skew.
+                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
+                Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.Create
+            };
+
+            // Generate the shared access signature on the blob, setting the constraints directly on the signature.
+            sasBlobToken = blob.GetSharedAccessSignature(adHocSAS);
+
+            Console.WriteLine("SAS for blob (ad hoc): {0}", sasBlobToken);
+            Console.WriteLine();
+        }
+        else
+        {
+            // Generate the shared access signature on the blob. In this case, all of the constraints for the
+            // shared access signature are specified on the container's stored access policy.
+            sasBlobToken = blob.GetSharedAccessSignature(null, policyName);
+
+            Console.WriteLine("SAS for blob (stored access policy): {0}", sasBlobToken);
+            Console.WriteLine();
+        }
+
+        // Return the URI string for the container, including the SAS token.
+        return blob.Uri + sasBlobToken;
+    }
+
+    ```
+
+* move items in blob storage between storage accounts or containers [AzCopy](https://docs.microsoft.com/en-us/azure/storage/scripts/storage-common-transfer-between-storage-accounts?toc=%2fpowershell%2fmodule%2ftoc.json)
+    - *New-AzStorageContext* creates and check storage context with storage account name and key
+    - *Get-AzStorageContainer* lists all the containers in a storage account
+    - *AzCopy* command to copy each container from the source storage account to the destination storage account
+    ```ps
+    $azCopyCmd = [string]::Format("""{0}"" /source:{1} /dest:{2} /sourcekey:""{3}"" /destkey:""{4}"" /snapshot /y /s /synccopy",$AzCopyPath, $container.CloudBlobContainer.Uri.AbsoluteUri, $destContainer.Uri.AbsoluteUri, $srcStorageAccountKey, $DestStorageAccountKey)    
+    ```
+
 * set and retrieve properties and metadata
+    - Blob containers support **system properties** and **user-defined metadata** (name value pairs), in addition to the data they contain
+    - *FetchAttributesAsync* must be called first, before reading them
+    - Metadata names must be valid HTTP header names and valid C# identifiers
+    - Retrieve container properties
+    ```cs
+    async Task ReadContainerPropertiesAsync(CloudBlobContainer container)
+    {
+        // Fetch some container properties and write out their values.
+        await container.FetchAttributesAsync();
+        Console.WriteLine("Properties for container {0}", container.StorageUri.PrimaryUri);
+        Console.WriteLine("Public access level: {0}", container.Properties.PublicAccess);
+        Console.WriteLine("Last modified time in UTC: {0}", container.Properties.LastModified);
+    }
+    ```
+    - Set and retrieve metadata
+    ```cs
+    async Task AddContainerMetadataAsync(CloudBlobContainer container)
+    {
+        // Add some metadata to the container.
+        container.Metadata.Add("docType", "textDocuments");
+        container.Metadata["category"] = "guidance";
+
+        // Set the container's metadata.
+        await container.SetMetadataAsync();
+    }
+
+    async Task ReadContainerMetadataAsync(CloudBlobContainer container)
+    {
+        // Fetch container attributes in order to populate the container's properties and metadata.
+        await container.FetchAttributesAsync();
+
+        // Enumerate the container's metadata.
+        Console.WriteLine("Container metadata:");
+        foreach (var metadataItem in container.Metadata)
+        {
+            Console.WriteLine("\tKey: {0}", metadataItem.Key);
+            Console.WriteLine("\tValue: {0}", metadataItem.Value);
+        }
+    }
+    ```
+
 * implement blob leasing
 * implement data archiving and retention
