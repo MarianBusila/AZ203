@@ -517,4 +517,12 @@
     | az storage blob lease renew | Renews the lease. |
 
     - 
-* implement data archiving and retention
+* implement data archiving and retention [Access tiers](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers), [Immutable blobs](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-immutable-storage)
+    - access tier can be specified at account level and at blob level. *archive* tier can be applied only at the object level
+    - *Premium performance block blob storage*: data stored in SSD, ideal for cpaturing telemetry data, messaging, static web content, etc
+    - *Blob rehydration*: changing archive tier to hot or cool in order to access the blob
+    - Blob data cannot be read or modified while in the archive tier until rehydrated; only blob metadata read operations are supported while in archive.
+    - Immutable storage for Azure Blob storage enables users to store business-critical data objects in a WORM (Write Once, Read Many) state. This state makes the data non-erasable and non-modifiable for a user-specified interval
+    - Immutable storage for Azure Blob storage supports two types of WORM or immutable policies: time-based retention and legal holds
+     - Time-based retention policy is unlocked when created. It must be locked for complience.
+     - Immutable storage can be used with any blob type as it is set at the container level
