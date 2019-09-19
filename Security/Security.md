@@ -27,11 +27,29 @@
 
 * implement CBAC (Claims-Based Access Control) authorization
 * implement RBAC (Role-Based Access Control) authorization
-* create shared access signatures
+* create shared access signatures [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/en-ca/azure/storage/common/storage-sas-overview)
+    - A common scenario where a SAS is useful is a service where users read and write their own data to your storage account
+    - a SAS cannot be revoked easily (unless the storage account key is regenerated), so the time interval when the SAS is valid should be limited
+    - Always use HTTPS to create or distribute a SAS
+    - Use a user delegation SAS when possible
+    - Have a revocation plan in place for a SAS
+    - Define a stored access policy for a service SAS. Stored access policies give you the option to revoke permissions for a service SAS without having to regenerate the storage account keys
+    - Use near-term expiration times on an ad hoc SAS service SAS or account SAS. In this way, even if a SAS is compromised, it's valid only for a short time
+    - Have clients automatically renew the SAS if necessary
+    - Be careful with SAS start time. In general, set the start time to be at least 15 minutes in the past. Or, don't set it at all, which will make it valid immediately in all cases
+    - Be specific with the resource to be accessed. A security best practice is 
+    to provide a user with the minimum required privileges
+    - Know when not to use a SAS. Sometimes the risks associated with a particular operation against your storage account outweigh the benefits of using a SAS. For such operations, create a middle-tier service that writes to your storage account after performing business rule validation, authentication, and auditing
 
 ## Implement secure data solutions
 
-* encrypt and decrypt data at rest and in transit
+* encrypt and decrypt data at rest and in transit [Azure data security and encryption best practices](https://docs.microsoft.com/en-ca/azure/security/fundamentals/data-encryption-best-practices)
+    - Grant access to users, groups, and applications (using RBAC) at a specific scope (subscription, a resource group, or just a specific key vault)
+    - Enable the soft delete and purge protection features of Key Vault, particularly for keys that are used to encrypt data at rest. Deletion of these keys is equivalent to data loss
+    -  Apply disk encryption at rest. Azure Storage and Azure SQL Database encrypt data at rest by default.
+    - use SSL/TLS protocols to exchange data across different locations
+    - For data moving between your on-premises infrastructure and Azure, consider appropriate safeguards such as HTTPS or VPN
+
 * create, read, update, and delete keys, secrets, and certificates by using the KeyVault API [Quickstart: Set and retrieve a secret from Azure Key Vault using Azure CLI](https://docs.microsoft.com/en-us/azure/key-vault/quick-create-cli)
     - Azure Key Vault is a cloud service that works as a secure secrets store. You can securely store keys, passwords, certificates.
     ```sh
@@ -60,5 +78,5 @@
     await kvClient.SetSecretAsync($"{kvURL}", secretName, secretValue);
 
     var keyvaultSecret = await kvClient.GetSecretAsync($"{kvURL}", secretName).ConfigureAwait(false);
-    
+
     ```
