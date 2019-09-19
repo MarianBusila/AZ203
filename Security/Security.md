@@ -21,7 +21,10 @@
     - A bearer token is a lightweight security token that grants the “bearer” access to a protected resource
     - **OpenID Connect** extends the OAuth 2.0 authorization protocol to use as an authentication protocol, so that you can do single sign-on using OAuth. OpenID Connect introduces the concept of an ID token, which is a security token that allows the client to verify the identity of the user.
     - 
-* implement Managed Service Identity (MSI)/Service Principal authentication
+* implement Managed Service Identity (MSI)/Service Principal authentication [Use the portal to create an Azure AD application and service principal that can access resources](https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal), [What is managed identities for Azure resources?]https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview)
+    - Instead of creating a service principal, consider using managed identities for Azure resources for your application identity
+    - in the Portal, **Azure Active Directory** -> **App registrations** -> **New registration**. After this step, you can assign a role to your application
+    - managed identities can be used with various Azure services like: Azure Functions, ServiceBus, Event Hubs, etc
 
 ## Implement access control
 
