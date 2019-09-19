@@ -26,7 +26,24 @@
 ## Implement access control
 
 * implement CBAC (Claims-Based Access Control) authorization
-* implement RBAC (Role-Based Access Control) authorization
+* implement RBAC (Role-Based Access Control) authorization [What is role-based access control (RBAC) for Azure resources?](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview), [Grant a user access to Azure resources using RBAC and the Azure portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/quickstart-assign-role-user-portal)
+    - Role-based access control (RBAC) helps you manage who has access to Azure resources, what they can do with those resources, and what areas they have access to. RBAC is an authorization system built on Azure Resource Manager that provides fine-grained access management of Azure resources
+    - A *security principal* is an object that represents a user, group, service principal, or managed identity that is requesting access to Azure resources.
+    - A *role definition* is a collection of permissions (read, write, delete). Build-in roles: Owner, Contrinutor, Reader,  Virtual Machine Contributor, etc.
+    - A *scope* is the set of resources that the access applies to: management group, subscription, resource group, or resource.
+    - Similar to a role assignment, a deny assignment attaches a set of deny actions to a user, group, service principal, or managed identity at a particular scope for the purpose of denying access
+    - a role assignment can be done in the Portal under Access Control(IAM) section, CLI, etc    
+    ```sh
+    az role assignment list --subscription <subscription_name_or_id>
+    az role assignment list --resource-group <resource_group>
+    az role assignment list --assignee <assignee>
+
+    az role assignment create --role <role_name_or_id> --assignee <assignee> --subscription <subscription_name_or_id>
+    az role assignment create --role <role_id> --assignee <assignee> --resource-group <resource_group>
+
+    az role assignment delete --assignee <assignee> --role <role_name_or_id> --resource-group <resource_group>
+    ```
+
 * create shared access signatures [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/en-ca/azure/storage/common/storage-sas-overview)
     - A common scenario where a SAS is useful is a service where users read and write their own data to your storage account
     - a SAS cannot be revoked easily (unless the storage account key is regenerated), so the time interval when the SAS is valid should be limited
