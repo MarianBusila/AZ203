@@ -31,13 +31,37 @@
 ## Integrate caching and content delivery within solutions
 
 * store and retrieve data in Azure Redis cache
+    ```cs
+    private static Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
+        {
+            string cacheConnection = ConfigurationManager.AppSettings["CacheConnection"].ToString();
+            return ConnectionMultiplexer.Connect(cacheConnection);
+        });
+
+    public static ConnectionMultiplexer Connection
+    {
+        get
+        {
+            return lazyConnection.Value;
+        }
+    }
+
+    IDatabase cache = lazyConnection.Value.GetDatabase();
+    cache.StringSet("Message", "Hello! The cache is working from a .NET console app!")
+    cache.StringGet("Message");
+
+    ```
+
 * develop code to implement CDNs in solutions [What is Azure CDN?](https://docs.microsoft.com/en-us/azure/cdn/cdn-overview), [Getting started on managing CDN in .NET](https://github.com/Azure-Samples/cdn-dotnet-manage-cdn)
     - A content delivery network (CDN) is a distributed network of servers that can efficiently deliver web content to users. CDNs store cached content on edge servers in point-of-presence (POP) locations that are close to end users, to minimize latency.
     - you need to create a CDN profile which is a collection of CDN endpoints. An endpoint can have as Origin, for example, a Storage
     - the endpoint name is a subdomain of azureedge.net and is included in the URL for delivering CDN content by default (for example, https://contoso.azureedge.net/photo.png). You can map a custom domain with a CDN endpoint by creating a CNAME DNS Record and associating the custom domain with the CDN endpoint.
+    - application code has to be modified to access the CDN endpoint instead of the origin URL
+    - you can preload assets in CDN endpoints for imediate availability
     
-* invalidate cache content (CDN or Redis)
+* invalidate cache content (CDN or Redis) [Purge an Azure CDN endpoint](https://docs.microsoft.com/en-us/azure/cdn/cdn-purge-endpoint)
     - on CDN you can *Purge* the endpoint (Portal or API) or you can do versioning of files
+    - Azure CDN edge nodes will cache assets until the asset's time-to-live (TTL) expires
 
 ## Instrument solutions to support monitoring and logging
 
