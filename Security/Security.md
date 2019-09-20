@@ -47,6 +47,11 @@
     az role assignment delete --assignee <assignee> --role <role_name_or_id> --resource-group <resource_group>
     ```
 
+    - create authentication file to be used with Azure Management Libraries for .NET
+    ```sh
+    az ad sp create-for-rbac --sdk-auth > my.azureauth
+    ```
+
 * create shared access signatures [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/en-ca/azure/storage/common/storage-sas-overview)
     - A common scenario where a SAS is useful is a service where users read and write their own data to your storage account
     - a SAS cannot be revoked easily (unless the storage account key is regenerated), so the time interval when the SAS is valid should be limited
