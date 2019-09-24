@@ -189,4 +189,7 @@
     | where CounterName == "Available MBytes" 
     | summarize avg(CounterValue) by bin(TimeGenerated, 1h) 
     ```
-* implement Application Insights Web Test and Alerts
+* implement Application Insights Web Test and Alerts [Monitor the availability of any website](https://docs.microsoft.com/en-us/azure/azure-monitor/app/monitor-web-app-availability), [Add availability test with PowerShell](https://docs.microsoft.com/en-us/azure/azure-monitor/app/powershell#add-an-availability-test)
+    - in Azure Application Insights you can configure sending web requests to your application at regular intervals from points around the world.
+    - the URL to be tested must be visible from the internet. If your URL is not visible from the public internet, you can choose to selectively open up your firewall to allow only the test transactions through
+    - you can create simple URL ping test or multi-step web test
