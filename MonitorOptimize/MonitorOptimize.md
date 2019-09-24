@@ -66,5 +66,91 @@
 ## Instrument solutions to support monitoring and logging
 
 * configure instrumentation in an app or service by using Application Insights
+[Application Insights for ASP.NET Core applications](https://docs.microsoft.com/en-us/azure/azure-monitor/app/asp-net-core), [Application Insights for .NET console applications](https://docs.microsoft.com/en-us/azure/azure-monitor/app/console)
+    - DependencyTrackingTelemetryModule currently tracks the following dependencies automatically: Http/Https, SQL, Azure Storage, EventHub Client Sdk, ServiceBus Client Sdk, CosmosDB
+    ```cs
+    TelemetryConfiguration configuration = TelemetryConfiguration.CreateDefault();
+    configuration.InstrumentationKey = instrumentationKey;
+    var telemetryClient = new TelemetryClient(configuration);
+    telemetryClient.TrackTrace("Hello World!");
+    ```
+    - the following modules are added automatically
+        - RequestTrackingTelemetryModule - Collects RequestTelemetry from incoming web requests.
+        - DependencyTrackingTelemetryModule - Collects DependencyTelemetry from outgoing http calls and sql calls.
+        - PerformanceCollectorModule - Collects Windows PerformanceCounters.
+        - QuickPulseTelemetryModule - Collects telemetry for showing in Live Metrics portal.
+        - AppServicesHeartbeatTelemetryModule - Collects heart beats (which are send as custom metrics), about Azure App Service environment where application is hosted.
+        - AzureInstanceMetadataTelemetryModule - Collects heart beats (which are send as custom metrics), about Azure VM environment where application is hosted.
+        - EventCounterCollectionModule - Collects EventCounters.. This module is a new feature and is available in SDK Version 2.8.0-beta3 and higher.
+    - *Telemetry channels* are responsible for buffering telemetry items and sending them to the Application Insights service, where they're stored for querying and analysis. The *Send(ITelemetry item)* method of a telemetry channel is called after all telemetry initializers and telemetry processors are called. So, any items dropped by a telemetry processor won't reach the channel. *InMemoryChannel* and *ServerTelemetryChannel* are built-in.
+    - *Sampling* is a feature in Azure Application Insights and it is the recommended way to reduce telemetry traffic and storage, while preserving a statistically correct analysis of application data. Sampling retains 1 in n records and discards the rest. For example, it might retain one in five events, a sampling rate of 20%. The sampling divisor n is reported in each record in the property *itemCount*. 
+    - *Telemetry Initializers* add properties to any telemetry sent from your app, including telemetry from the standard modules. For example, you could add calculated values or version numbers by which to filter the data in the portal. (ITelemetryInitializer)
+    - *Telemetry Processors* gives you more direct control over what is included or excluded from the telemetry stream. You can use it in conjunction with Sampling, or separately. All telemetry goes through your processor, and you can choose to drop it from the stream, or add properties. (ITelemetryProcessor)
+    - Using ApplicationInsightsServiceOptions
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        Microsoft.ApplicationInsights.AspNetCore.Extensions.ApplicationInsightsServiceOptions aiOptions
+                    = new Microsoft.ApplicationInsights.AspNetCore.Extensions.ApplicationInsightsServiceOptions();
+        // Disables adaptive sampling.
+        aiOptions.EnableAdaptiveSampling = false;
+
+        // Disables QuickPulse (Live Metrics stream).
+        aiOptions.EnableQuickPulseMetricStream = false;
+        services.AddApplicationInsightsTelemetry(aiOptions);
+    }
+    ```
+    - Adding Telemetry initializers and processors
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<ITelemetryInitializer, MyCustomTelemetryInitializer>();
+        services.AddApplicationInsightsTelemetryProcessor<MyFirstCustomTelemetryProcessor>();
+    }
+    ```
+    - Configure and remove Telemetry modules
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddApplicationInsightsTelemetry();
+
+        // The following configures DependencyTrackingTelemetryModule.
+        // Similarly, any other default modules can be configured.
+        services.ConfigureTelemetryModule<DependencyTrackingTelemetryModule>((module, o) =>
+                        {
+                            module.EnableW3CHeadersInjection = true;
+                        });
+
+        // The following removes all default counters from EventCounterCollectionModule, and adds a single one.
+        services.ConfigureTelemetryModule<EventCounterCollectionModule>(
+                            (module, o) =>
+                            {
+                                module.Counters.Clear();
+                                module.Counters.Add(new EventCounterCollectionRequest("System.Runtime", "gen-0-size"));
+                            }
+                        );
+
+        // The following removes PerformanceCollectorModule to disable perf-counter collection.
+        // Similarly, any other default modules can be removed.
+        var performanceCounterService = services.FirstOrDefault<ServiceDescriptor>(t => t.ImplementationType == typeof(PerformanceCollectorModule));
+        if (performanceCounterService != null)
+        {
+         services.Remove(performanceCounterService);
+        }
+    }
+    ```
+    - Configure a Telemetry channel
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Use the following to replace the default channel with InMemoryChannel.
+        // This can also be applied to ServerTelemetryChannel.
+        services.AddSingleton(typeof(ITelemetryChannel), new InMemoryChannel() {MaxTelemetryBufferCapacity = 19898 });
+
+        services.AddApplicationInsightsTelemetry();
+    }
+    ```
+
+
 * analyze and troubleshoot solutions by using Azure Monitor
 * implement Application Insights Web Test and Alerts

@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29123.88
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppInsightsQuickStart", "AppInsightsQuickStart.csproj", "{74D120B0-E6EE-4320-B33B-EAC4CC8922CE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{74D120B0-E6EE-4320-B33B-EAC4CC8922CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74D120B0-E6EE-4320-B33B-EAC4CC8922CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74D120B0-E6EE-4320-B33B-EAC4CC8922CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74D120B0-E6EE-4320-B33B-EAC4CC8922CE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FA335611-8B24-4A99-825B-B19855DD3461}
+	EndGlobalSection
+EndGlobal
