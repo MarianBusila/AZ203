@@ -152,5 +152,41 @@
     ```
 
 
-* analyze and troubleshoot solutions by using Azure Monitor
+* analyze and troubleshoot solutions by using Azure Monitor [Get started with Log Analytics in Azure Monitor](https://docs.microsoft.com/en-ca/azure/azure-monitor/log-query/get-started-portal)
+    - All data collected by Azure Monitor fits into one of two fundamental types, metrics and logs. Metrics are numerical values that describe some aspect of a system at a particular point in time. They are lightweight and capable of supporting near real-time scenarios. Logs contain different kinds of data organized into records with different sets of properties for each type. Telemetry such as events and traces are stored as logs in addition to performance data so that it can all be combined for analysis.
+    - You can create and test queries using Log Analytics in the Azure portal and then either directly analyze the data using these tools or save queries for use with visualizations or alert rules.
+    - Azure Monitor include features like Application Insights, Azure Monitor for containers and VMs
+    - Log Analytics is a web tool used to write and execute Azure Monitor log queries. Open it by selecting Logs in the Azure Monitor menu. It starts with a new blank query.
+    - The *schema* is a collection of tables visually grouped under a logical category. Several of the categories are from monitoring solutions. The LogManagement category contains common data such as Windows and Syslog events, performance data, and agent heartbeats.
+    ```
+    Event 
+    | search "error" 
+    | where Source == "MSSQLSERVER" 
+    | order by TimeGenerated desc
+
+    // available memory(MB) per hour for computers with name starting with Contoso
+    Perf 
+    | where TimeGenerated > ago(1d) 
+    | where Computer startswith "Contoso" 
+    | where CounterName == "Available MBytes" 
+    | summarize count() by bin(TimeGenerated, 1h), Computer
+    | render timechart
+
+    // select and compute columns
+    SecurityEvent
+    | top 10 by TimeGenerated 
+    | project Computer, TimeGenerated, EventDetails=Activity, EventCode=substring(Activity, 0, 4)
+
+    // grouping
+    Perf
+    | where TimeGenerated > ago(1h)
+    | summarize avg(CounterValue) by Computer, CounterName   
+
+    // grouping by time column
+    Perf 
+    | where TimeGenerated > ago(7d)
+    | where Computer == "ContosoAzADDS2" 
+    | where CounterName == "Available MBytes" 
+    | summarize avg(CounterValue) by bin(TimeGenerated, 1h) 
+    ```
 * implement Application Insights Web Test and Alerts
