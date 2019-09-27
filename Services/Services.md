@@ -246,14 +246,98 @@
     -
 ## Develop event-based solutions
 
-* implement solutions that use Azure Event Grid
+* implement solutions that use Azure Event Grid [Azure Event Grid documentation](https://docs.microsoft.com/en-us/azure/event-grid/)
+    - Azure Event Grid allows you to easily build applications with event-based architectures.
+    - There are five concepts in Azure Event Grid that let you get going:
+        - **Events** - What happened.
+        - **Event sources** - Where the event took place.
+        - **Topics** - The endpoint where publishers send events.
+        - **Event subscriptions** - The endpoint or built-in mechanism to route events, sometimes to more than one handler. Subscriptions are also used by handlers to intelligently filter incoming events.
+        - **Event handlers** - The app or service reacting to the event.
+    ```sh
+    az eventgrid topic create --name $topicname -l westus2 -g gridResourceGroup
 
-* implement solutions that use Azure Notification Hubs
+    endpoint=https://$sitename.azurewebsites.net/api/updates
+    az eventgrid event-subscription create \
+    --source-resource-id "/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.EventGrid/topics/$topicname" 
+    --name demoViewerSub 
+    --endpoint $endpoint
+    ```
 
-* implement solutions that use Azure Event Hub
+    ```cs
+    string topicEndpoint = "https://<YOUR-TOPIC-NAME>.<REGION-NAME>-1.eventgrid.azure.net/api/events";
+    string topicKey = "<YOUR-TOPIC-KEY>";
+
+    string topicHostname = new Uri(topicEndpoint).Host;
+    TopicCredentials topicCredentials = new TopicCredentials(topicKey);
+    EventGridClient client = new EventGridClient(topicCredentials);
+
+    client.PublishEventsAsync(topicHostname, GetEventsList()).GetAwaiter().GetResult();
+    ```
+
+* implement solutions that use Azure Notification Hubs [Azure Notification Hubs Documentation](https://docs.microsoft.com/en-us/azure/notification-hubs/)
+    - Azure Notification Hubs provide an easy-to-use and scaled-out push engine that allows you to send notifications to any platform (iOS, Android, Windows, Kindle, Baidu, etc.) from any backend (cloud or on-premises).
+    - Push notifications are delivered through platform-specific infrastructures called Platform Notification Systems (PNSes)
+    - you create a NotificationHub namespace and add notification hubs inside it
+    - to configure a notication hub, you must set the OBS settings for different platforms like Apple Push Notification Service, Google Firebase Cloud Messaging, Microsoft Push Notification Service for Windows Phone, etc
+
+* implement solutions that use Azure Event Hub [Azure Event Hubs documentation](https://docs.microsoft.com/en-us/azure/event-hubs/)
+    - Azure Event Hubs is a big data streaming platform and event ingestion service. It can receive and process millions of events per second. Data sent to an event hub can be transformed and stored by using any real-time analytics provider or batching/storage adapters.
+    - Event Hubs provides a unified streaming platform with time retention buffer, decoupling event producers from event consumers.
+    - Azure Event Hubs Capture enables you to automatically capture the streaming data in Event Hubs in an Azure Blob storage or Azure Data Lake Storage
+    - Event Hubs uses a partitioned consumer model, enabling multiple applications to process the stream concurrently and letting you control the speed of processing.
+    - Event Hubs contains the following key components:
+        - **Event producers**: Any entity that sends data to an event hub. Event publishers can publish events using HTTPS or AMQP 1.0 or Apache Kafka (1.0 and above)
+        - **Partitions**: Each consumer only reads a specific subset, or partition, of the message stream.
+        - **Consumer groups**: A view (state, position, or offset) of an entire event hub. Consumer groups enable consuming applications to each have a separate view of the event stream. They read the stream independently at their own pace and with their own offsets.
+        - **Throughput units**: Pre-purchased units of capacity that control the throughput capacity of Event Hubs.
+        - **Event receivers**: Any entity that reads event data from an event hub. All Event Hubs consumers connect via the AMQP 1.0 session. The Event Hubs service delivers events through a session as they become available. All Kafka consumers connect via the Kafka protocol 1.0 and later.
+    
+    ```cs
+    var connectionStringBuilder = new EventHubsConnectionStringBuilder(EventHubConnectionString)
+    {
+        EntityPath = EventHubName
+    };
+
+    EventHubClient eventHubClient = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+    await eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(message)));
+    await eventHubClient.CloseAsync();
+    ```
 
 ## Develop message-based solutions
 
-* implement solutions that use Azure Service Bus
+* implement solutions that use Azure Service Bus [Azure Service Bus Messaging documentation](https://docs.microsoft.com/en-us/azure/service-bus-messaging)
+    - Microsoft Azure Service Bus is a fully managed enterprise integration message broker. Service Bus is most commonly used to decouple applications and services from each other, and is a reliable and secure platform for asynchronous data and state transfer. Data is transferred between different applications and services using messages. A message is in binary format, which can contain JSON, XML, or just text.
+    - To realize a first-in, first-out (FIFO) guarantee in Service Bus, use sessions. **Message sessions** enable joint and ordered handling of unbounded sequences of related messages.
+    - The **auto-forwarding** feature enables you to chain a queue or subscription to another queue or topic that is part of the same namespace
+    - Service Bus supports a **dead-letter queue (DLQ)** to hold messages that cannot be delivered to any receiver, or messages that cannot be processed
+    - you can submit messages to a queue or topic for **delayed processing**; for example, to schedule a job to become available for processing by a system at a certain time.
+    - When a queue or subscription client receives a message that it is willing to process, but for which processing is not currently possible due to special circumstances within the application, the entity has the option to **defer retrieval** of the message to a later point.
+    - A **transaction** groups two or more operations together into an execution scope. Service Bus supports grouping operations against a single messaging entity (queue, topic, subscription) within the scope of a transaction.
 
-* implement solutions that use Azure Queue Storage queues
+* implement solutions that use Azure Queue Storage queues [Get started with Azure Queue storage using .NET](https://docs.microsoft.com/en-us/azure/storage/queues/storage-dotnet-how-to-use-queues)
+    ```cs
+    CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+    CloudConfigurationManager.GetSetting("StorageConnectionString"));
+    CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+
+    // create queue
+    CloudQueue queue = queueClient.GetQueueReference("myqueue");
+    queue.CreateIfNotExists();
+
+    // insert message
+    CloudQueueMessage message = new CloudQueueMessage("Hello, World");
+    queue.AddMessage(message);
+
+    // peek at the message
+    CloudQueueMessage peekedMessage = queue.PeekMessage();
+
+    // get the next message
+    CloudQueueMessage retrievedMessage = queue.GetMessage();
+
+    //Process the message in less than 30 seconds, and then delete the message
+    queue.DeleteMessage(retrievedMessage);
+
+    // Delete the queue.
+    queue.Delete();
+    ```
