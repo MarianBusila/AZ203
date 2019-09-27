@@ -184,12 +184,66 @@
 
 ## Establish API Gateways
 
-* create an APIM instance
+* Overview [Overview](https://docs.microsoft.com/en-us/azure/api-management/api-management-key-concepts)
+    - API Management (APIM) is a way to create consistent and modern API gateways for existing back-end services
+    - The **API gateway** is the endpoint that:
 
-* configure authentication for APIs
+        - Accepts API calls and routes them to your backends.
+        - Verifies API keys, JWT tokens, certificates, and other credentials.
+        - Enforces usage quotas and rate limits.
+        - Transforms your API on the fly without code modifications.
+        - Caches backend responses where set up.
+        - Logs call metadata for analytics purposes.
 
-* define policies for APIs
+    - The **Azure portal** is the administrative interface where you set up your API program. Use it to:
 
+        - Define or import API schema.
+        - Package APIs into products.
+        - Set up policies like quotas or transformations on the APIs.
+        - Get insights from analytics.
+        - Manage users.
+        
+    - The **Developer portal** serves as the main web presence for developers, where they can:
+
+        - Read API documentation.
+        - Try out an API via the interactive console.
+        - Create an account and subscribe to get API keys.
+        - Access analytics on their own usage.
+
+    - **Operations** in API Management are highly configurable, with control over URL mapping, query and path parameters, request and response content, and operation response caching. Rate limit, quotas, and IP restriction policies can also be implemented at the API or individual operation level.
+    - **Products** are how APIs are surfaced to developers. Products in API Management have one or more APIs, and are configured with a title, description, and terms of use. Products can be Open or Protected.
+    - **Groups** are used to manage the visibility of products to developers: *Administrators, Developers, Guests*
+    - When developers subscribe to a product, they are granted the primary and secondary key for the product. This key is used when making calls into the product's APIs
+    - **Policies** are a powerful capability of API Management that allow the Azure portal to change the behavior of the API through configuration. Policies are a collection of statements that are executed sequentially on the request or response of an API. Popular statements include format conversion from XML to JSON and call rate limiting to restrict the number of incoming calls from a developer, and many other policies are available.
+        
+* create an APIM instance [Create a new Azure API Management service instance](https://docs.microsoft.com/en-us/azure/api-management/get-started-create-service-instance)
+    - after creating the APIM service, you can add an API using OpenAPI, WSDL, LogicApp, FunctionApp, etc. You can create a Product that can contain one or multiple APIs, you can mock API responses, you can protect your API by adding inbound (set rate limit per subscription) and outbound policies(remove headers from the reponse, replace string in  the body like the url of the backend), you can monitor the API be checking the Metrics and creating Alerts (for example for unauthorized access), you can add revisions and versions
+    - 
+
+* configure authentication for APIs [Create subscriptions in Azure API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-howto-create-subscriptions),
+[How to secure APIs using client certificate authentication in API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-howto-mutual-certificates-for-clients)
+    - After you create a subscription, two API keys are provided to access the APIs. One key is primary, and one is secondary. Client applications that need to consume the published APIs must include a valid subscription key in HTTP requests when they make calls to those APIs (Ocp-Apim-Subscription-key header must be set in the request)
+    - API Management provides the capability to secure access to APIs (i.e., client to API Management) also using client certificates. You can validate incoming certificate and check certificate properties against desired values using policy expressions.
+    ```xml
+    Checking a thumbprint against certificates uploaded to API Management
+    <choose>
+        <when condition="@(context.Request.Certificate == null || !context.Request.Certificate.Verify()  || !context.Deployment.Certificates.Any(c => c.Value.Thumbprint == context.Request.Certificate.Thumbprint))" >
+            <return-response>
+                <set-status code="403" reason="Invalid client certificate" />
+            </return-response>
+        </when>
+    </choose>
+    ```
+
+* define policies for APIs [API Management policy samples]https://docs.microsoft.com/en-us/azure/api-management/policy-samples), [API Management policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-policies),
+[How to set or edit Azure API Management policies](https://docs.microsoft.com/en-us/azure/api-management/set-edit-policies)
+    - Policies can be configured globally or at the scope of a Product, API, or Operation
+    - Policy scopes are evaluated in the following order:
+        1. Global scope
+        2. Product scope
+        3. API scope
+        4. Operation scope
+    -
 ## Develop event-based solutions
 
 * implement solutions that use Azure Event Grid
