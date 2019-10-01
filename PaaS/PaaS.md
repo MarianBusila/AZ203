@@ -47,8 +47,13 @@
 ## Create Azure App Service mobile apps (TODO)
 
 * add push notifications for mobile apps
-* enable offline sync for mobile app
-* implement a remote instrumentation strategy for mobile devices
+* enable offline sync for mobile app [Offline Data Sync in Azure Mobile Apps](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-offline-data-sync)
+    - When your app is in offline mode, you can still create and modify data, which are saved to a local store. When the app is back online, it can synchronize local changes with your Azure Mobile App backend
+    - A **local store** is the data persistence layer on the client device. The Azure Mobile Apps client SDKs provide a default local store implementation. On Windows, Xamarin and Android, it is based on SQLite. On iOS, it is based on Core Data.
+    - To support offline use, your app should instead use the sync table APIs, such as *IMobileServiceSyncTable* (.NET client SDK) or *MSSyncTable* (iOS client). All the same CRUD operations (Create, Read, Update, Delete) work against sync table APIs, except now they read from or write to a local store.
+    - When using sync tables, your client code controls when local changes are synchronized with an Azure Mobile App backend. Nothing is sent to the backend until there is a call to push local changes. Similarly, the local store is populated with new data only when there is a call to pull data
+* implement a remote instrumentation strategy for mobile devices [Use TeamViewer to remotely administer Intune devices](https://docs.microsoft.com/en-ca/intune/teamviewer-support)
+
 
 ## Create Azure App Service API apps
 

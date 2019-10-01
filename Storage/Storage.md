@@ -154,6 +154,22 @@
             - Related data changes frequently.
             - Referenced data could be unbounded.
         - data duplication is encoureged to improve read operations
+        - SQL Queries
+        ```sql
+        SELECT *
+        FROM Families f
+        WHERE f.id = "AndersenFamily"
+
+        SELECT {"Name":f.id, "City":f.address.city} AS Family
+        FROM Families f
+        WHERE f.address.city = f.address.state
+
+        SELECT c.givenName
+        FROM Families f
+        JOIN c IN f.children
+        WHERE f.id = 'WakefieldFamily'
+        ORDER BY f.address.city ASC
+        ```
 
 
 
@@ -242,6 +258,9 @@
     | az sql elastic-pool delete | Deletes the elastic pool |
 
 * create, read, update, and delete data tables by using code
+    - ExecuteScalar() only returns the value from the first column of the first row of your query.
+    - ExecuteReader() returns an object that can iterate over the entire result set.
+    - ExecuteNonQuery() does not return data at all: only the number of rows affected by an insert, update, or delete.
     - use SQL connection string to connect to database
     ```cs
     SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
@@ -284,7 +303,7 @@
     - access tiers: hot (accessed frequently), cool (infrequently accessed and stored for at least 30 days), archive (rarely accessed and stored for at least 180 days with flexible latency requirements (on the order of hours))
     - data redundancy:(Locally redundant storage ),Zone-redundant storage (ZRS), Geo-redundant storage (GRS), Read-access geo-redundant storage (RA-GRS), Geo-zone-redundant storage (GZRS), Read-access geo-zone-redundant storage (RA-GZRS)
     - leases can be aquired on blobs to make sure they are not modified / deleted by other clients
-
+    - example access snapshot: http://storagesample.core.blob.windows.net/mydrives/myvhd?snapshot=2011-03-09T01:42:34.9360000Z
     - blob quickstart in .NET
     ```cs
     // Retrieve storage account information from connection string.
@@ -502,6 +521,19 @@
             Console.WriteLine("\tValue: {0}", metadataItem.Value);
         }
     }
+    ```
+    - Metadata headers are named with the header prefix x-ms-meta- and a custom name
+    - Property headers use standard HTTP header names (Content-Length, Cache-Control, etc)
+    - REST API container / blob
+    ```
+    // Retrieving Properties and Metadata
+    GET/HEAD https://myaccount.blob.core.windows.net/mycontainer?restype=container
+    GET/HEAD https://myaccount.blob.core.windows.net/mycontainer/myblob?comp=metadata
+
+    // Setting Metadata Headers
+    PUT https://myaccount.blob.core.windows.net/mycontainer?comp=metadata&restype=container
+    PUT https://myaccount.blob.core.windows.net/mycontainer/myblob?comp=metadata 
+    PUT https://myaccount.blob.core.windows.net/mycontainer/myblob?comp=properties
     ```
 
 * implement blob leasing [Azure CLI] (https://docs.microsoft.com/en-us/cli/azure/storage/blob/lease?view=azure-cli-latest), [.NET](https://www.red-gate.com/simple-talk/cloud/platform-as-a-service/azure-blob-storage-part-8-blob-leases/)

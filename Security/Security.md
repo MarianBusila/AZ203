@@ -100,7 +100,13 @@
         return (await authenticationContext.AcquireTokenAsync(resource, adCredential)).AccessToken;
     });
 
+    
     await kvClient.SetSecretAsync($"{kvURL}", secretName, secretValue);
+
+    SecretAttributes attributes = new SecretAttributes();
+    attributes.Expires = DateTime.UtcNow.AddDays(15);
+    var secret = await client.UpdateSecretAsync(secretKeyIdentifier, null, attributes, null).ConfigureAwait(false);
+
 
     var keyvaultSecret = await kvClient.GetSecretAsync($"{kvURL}", secretName).ConfigureAwait(false);
 

@@ -235,15 +235,55 @@
     </choose>
     ```
 
-* define policies for APIs [API Management policy samples]https://docs.microsoft.com/en-us/azure/api-management/policy-samples), [API Management policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-policies),
-[How to set or edit Azure API Management policies](https://docs.microsoft.com/en-us/azure/api-management/set-edit-policies)
+* define policies for APIs [API Management policy samples](https://docs.microsoft.com/en-us/azure/api-management/policy-samples), [API Management policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-policies),
+[How to set or edit Azure API Management policies](https://docs.microsoft.com/en-us/azure/api-management/set-edit-policies),
+[API Management access restriction policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-access-restriction-policies)
     - Policies can be configured globally or at the scope of a Product, API, or Operation
     - Policy scopes are evaluated in the following order:
         1. Global scope
         2. Product scope
         3. API scope
         4. Operation scope
-    -
+    - rate-limit / quota policy is per subscription, while rate-limit-by-key / quota-by=key is for a custom key which can be set in *counter-key* attribute (client IP address, or even the subscription)
+    - Examples:
+    ```xml
+    // remove http header
+    <set-header name="X-Powered-By" exists-action="delete" />
+    
+    // find and replace in body
+    <find-and-replace from="://conferenceapi.azurewebsites.net" to="://apiphany.azure-api.net/conference"/>
+
+    // throttle to 3 calls per 15 seconds for each subscription Id
+    <rate-limit-by-key calls="3" renewal-period="15" counter-key="@(context.Subscription.Id)" />
+
+    //  restrict a single client IP address to only 10 calls every minute, with a total of 1,000,000 calls and 10,000 kilobytes of bandwidth per month
+    <rate-limit-by-key  calls="10"
+          renewal-period="60"
+          counter-key="@(context.Request.IpAddress)" />
+
+    <quota-by-key calls="1000000"
+            bandwidth="10000"
+            renewal-period="2629800"
+            counter-key="@(context.Request.IpAddress)" />
+        
+    <check-header name="Authorization" failed-check-httpcode="401" failed-check-error-message="Not authorized" ignore-case="false">
+        <value>f6dc69a089844cf6b2019bae6d36fac8</value>
+    </check-header>
+
+    <rate-limit-by-key  calls="10"
+              renewal-period="60"
+              increment-condition="@(context.Response.StatusCode == 200)"
+              counter-key="@(context.Request.IpAddress)"/>    
+    
+    // restrict caller IP address
+    <ip-filter action="allow">
+        <address>13.66.201.169</address>
+        <address-range from="13.66.140.128" to="13.66.140.143" />
+    </ip-filter>
+
+    // The quota policy enforces a renewable or lifetime call volume and/or bandwidth quota, on a per subscription basis. When the call limit is reached, the caller receives a 403 Forbidden response status code
+    <quota calls="10000" bandwidth="40000" renewal-period="3600" />
+    ```
 ## Develop event-based solutions
 
 * implement solutions that use Azure Event Grid [Azure Event Grid documentation](https://docs.microsoft.com/en-us/azure/event-grid/)
