@@ -343,6 +343,56 @@
     await eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(message)));
     await eventHubClient.CloseAsync();
     ```
+    ```cs
+    public class SimpleEventProcessor : IEventProcessor
+    {
+        public Task CloseAsync(PartitionContext context, CloseReason reason)
+        {
+            Console.WriteLine($"Processor Shutting Down. Partition '{context.PartitionId}', Reason: '{reason}'.");
+            return Task.CompletedTask;
+        }
+
+        public Task OpenAsync(PartitionContext context)
+        {
+            Console.WriteLine($"SimpleEventProcessor initialized. Partition: '{context.PartitionId}'");
+            return Task.CompletedTask;
+        }
+
+        public Task ProcessErrorAsync(PartitionContext context, Exception error)
+        {
+            Console.WriteLine($"Error on Partition: {context.PartitionId}, Error: {error.Message}");
+            return Task.CompletedTask;
+        }
+
+        public Task ProcessEventsAsync(PartitionContext context, IEnumerable<EventData> messages)
+        {
+            foreach (var eventData in messages)
+            {
+                var data = Encoding.UTF8.GetString(eventData.Body.Array, eventData.Body.Offset, eventData.Body.Count);
+                Console.WriteLine($"Message received. Partition: '{context.PartitionId}', Data: '{data}'");
+            }
+
+            return context.CheckpointAsync();
+        }
+    }
+
+    // in Main
+     var eventProcessorHost = new EventProcessorHost(
+        EventHubName,
+        PartitionReceiver.DefaultConsumerGroupName,
+        EventHubConnectionString,
+        StorageConnectionString,
+        StorageContainerName);
+
+    // Registers the Event Processor Host and starts receiving messages
+    await eventProcessorHost.RegisterEventProcessorAsync<SimpleEventProcessor>();
+
+    Console.WriteLine("Receiving. Press ENTER to stop worker.");
+    Console.ReadLine();
+
+    // Disposes of the Event Processor Host
+    await eventProcessorHost.UnregisterEventProcessorAsync();
+    ```
 
 ## Develop message-based solutions
 
@@ -354,6 +404,101 @@
     - you can submit messages to a queue or topic for **delayed processing**; for example, to schedule a job to become available for processing by a system at a certain time.
     - When a queue or subscription client receives a message that it is willing to process, but for which processing is not currently possible due to special circumstances within the application, the entity has the option to **defer retrieval** of the message to a later point.
     - A **transaction** groups two or more operations together into an execution scope. Service Bus supports grouping operations against a single messaging entity (queue, topic, subscription) within the scope of a transaction.
+
+    - create service bus queue
+    ```sh
+    # Create a resource group
+    resourceGroupName="myResourceGroup"
+
+    az group create --name $resourceGroupName --location eastus
+
+    # Create a Service Bus messaging namespace with a unique name
+    namespaceName=myNameSpace$RANDOM
+    az servicebus namespace create --resource-group $resourceGroupName --name $namespaceName --location eastus
+
+    # Create a Service Bus queue
+    az servicebus queue create --resource-group $resourceGroupName --namespace-name $namespaceName --name BasicQueue
+
+    # Get the connection string for the namespace
+    connectionString=$(az servicebus namespace authorization-rule keys list --resource-group $resourceGroupName --namespace-name $namespaceName --name RootManageSharedAccessKey --query primaryConnectionString --output tsv)
+    ```
+
+    ```cs
+    // send messages to queue
+    IQueueClient queueClient = new QueueClient(ServiceBusConnectionString, QueueName);
+
+    var message = new Message(Encoding.UTF8.GetBytes(messageBody));
+    await queueClient.SendAsync(message);
+
+    await queueClient.CloseAsync();
+    ```
+
+    ```cs
+    // receive messages from queue
+    IQueueClient queueClient = new QueueClient(ServiceBusConnectionString, QueueName);
+
+    var messageHandlerOptions = new MessageHandlerOptions(ExceptionReceivedHandler)
+    {
+        // Maximum number of concurrent calls to the callback ProcessMessagesAsync(), set to 1 for simplicity.
+        // Set it according to how many messages the application wants to process in parallel.
+        MaxConcurrentCalls = 1,
+
+        // Indicates whether the message pump should automatically complete the messages after returning from user callback.
+        // False below indicates the complete operation is handled by the user callback as in ProcessMessagesAsync().
+        AutoComplete = false
+    };
+
+    // Register the function that processes messages.
+    queueClient.RegisterMessageHandler(ProcessMessagesAsync, messageHandlerOptions);
+
+    await queueClient.CloseAsync();
+
+    static async Task ProcessMessagesAsync(Message message, CancellationToken token)
+    {
+        // Process the message.
+        Console.WriteLine($"Received message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{Encoding.UTF8.GetString(message.Body)}");
+
+        // Complete the message so that it is not received again.
+        // This can be done only if the queue Client is created in ReceiveMode.PeekLock mode (which is the default).
+        await queueClient.CompleteAsync(message.SystemProperties.LockToken);
+
+        // Note: Use the cancellationToken passed as necessary to determine if the queueClient has already been closed.
+        // If queueClient has already been closed, you can choose to not call CompleteAsync() or AbandonAsync() etc.
+        // to avoid unnecessary exceptions.
+    }
+    ```
+
+    ```cs
+    // send messages to topic
+    ITopicClient topicClient = new TopicClient(ServiceBusConnectionString, TopicName);
+
+    var message = new Message(Encoding.UTF8.GetBytes(messageBody));
+    await topicClient.SendAsync(message);
+
+    await topicClient.CloseAsync();
+    ```
+
+    ```cs
+    ISubscriptionClient subscriptionClient = new SubscriptionClient(ServiceBusConnectionString, TopicName, SubscriptionName);
+
+    var messageHandlerOptions = new MessageHandlerOptions(ExceptionReceivedHandler)
+    {
+        MaxConcurrentCalls = 1,
+        AutoComplete = false
+    };
+
+    subscriptionClient.RegisterMessageHandler(ProcessMessagesAsync, messageHandlerOptions);
+
+    static async Task ProcessMessagesAsync(Message message, CancellationToken token)
+    {
+        // Process the message.
+        Console.WriteLine($"Received message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{Encoding.UTF8.GetString(message.Body)}");
+
+        await subscriptionClient.CompleteAsync(message.SystemProperties.LockToken);
+    }
+    ```
+
+    - the default behaviour for topic is bradcasting. Use topic filters to umplment patterns like partitioning (mutually exclusive), routing (not necessarily exclusive)
 
 * implement solutions that use Azure Queue Storage queues [Get started with Azure Queue storage using .NET](https://docs.microsoft.com/en-us/azure/storage/queues/storage-dotnet-how-to-use-queues)
     ```cs

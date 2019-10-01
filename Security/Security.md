@@ -20,7 +20,8 @@
     ```
     - A bearer token is a lightweight security token that grants the “bearer” access to a protected resource
     - **OpenID Connect** extends the OAuth 2.0 authorization protocol to use as an authentication protocol, so that you can do single sign-on using OAuth. OpenID Connect introduces the concept of an ID token, which is a security token that allows the client to verify the identity of the user.
-    - 
+    - when authenticating with Google, Facebook ,etc the redirect URI is *https://<app-name>.azurewebsites.net/.auth/login/google/callback*
+
 * implement Managed Service Identity (MSI)/Service Principal authentication [Use the portal to create an Azure AD application and service principal that can access resources](https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal), [What is managed identities for Azure resources?]https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview)
     - Instead of creating a service principal, consider using managed identities for Azure resources for your application identity
     - in the Portal, **Azure Active Directory** -> **App registrations** -> **New registration**. After this step, you can assign a role to your application
@@ -28,7 +29,29 @@
 
 ## Implement access control
 
-* implement CBAC (Claims-Based Access Control) authorization
+* implement CBAC (Claims-Based Access Control) authorization [Claims-based authorization in ASP.NET Core](https://docs.microsoft.com/en-us/aspnet/core/security/authorization/claims?view=aspnetcore-3.0)
+    - When an identity is created it may be assigned one or more claims issued by a trusted party. A claim is a name value pair that represents what the subject is, not what the subject can do. For example, you may have a driver's license, issued by a local driving license authority. Your driver's license has your date of birth on it. In this case the claim name would be DateOfBirth, the claim value would be your date of birth, for example 8th June 1970 and the issuer would be the driving license authority. Claims based authorization, at its simplest, checks the value of a claim and allows access to a resource based upon that value.
+    ```cs
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddMvc();
+
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("EmployeeOnly", policy => policy.RequireClaim("EmployeeNumber"));
+             options.AddPolicy("Founders", policy => policy.RequireClaim("EmployeeNumber", "1", "2", "3", "4", "5"));
+        });
+    }
+
+    // apply on controller
+    [Authorize(Policy = "EmployeeOnly")]
+    public class VacationController : Controller
+    {
+        public ActionResult VacationBalance()
+        {
+        }
+    }
+    ```
 * implement RBAC (Role-Based Access Control) authorization [What is role-based access control (RBAC) for Azure resources?](https://docs.microsoft.com/en-us/azure/role-based-access-control/overview), [Grant a user access to Azure resources using RBAC and the Azure portal](https://docs.microsoft.com/en-us/azure/role-based-access-control/quickstart-assign-role-user-portal)
     - Role-based access control (RBAC) helps you manage who has access to Azure resources, what they can do with those resources, and what areas they have access to. RBAC is an authorization system built on Azure Resource Manager that provides fine-grained access management of Azure resources
     - A *security principal* is an object that represents a user, group, service principal, or managed identity that is requesting access to Azure resources.

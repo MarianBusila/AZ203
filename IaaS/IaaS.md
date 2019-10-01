@@ -20,6 +20,17 @@
         -Size "Standard_B1ms" `
         -Credential (Get-Credential)
     ```
+
+    ```sh
+    az vm create \
+    --resource-group myResourceGroup \
+    --name myVM \
+    --image win2016datacenter \
+    --admin-username azureuser \
+    --admin-password myPassword
+
+    az vm open-port --port 80 --resource-group myResourceGroup --name myVM
+    ```
 * create ARM templates ([Portal](https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-manager-quickstart-create-templates-use-the-portal), [VisualStudio](https://docs.microsoft.com/en-us/azure/azure-resource-manager/vs-azure-tools-resource-groups-deployment-projects-create-deploy)))
     - create a new project from Azure Resource Group template selecting WebApp
     - deploy resources for web app
