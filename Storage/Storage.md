@@ -467,14 +467,17 @@
     serviceProperties.Logging.LoggingOperations = LoggingOperations.All;
     serviceProperties.Logging.RetentionDays = 14;
 
-     // Acquire the lease.
-    leaseId = await container.AcquireLeaseAsync(leaseDuration, leaseId);
+    // Acquire the lease. A lease can also be aquired on a blob
+    var leaseIdGuid = Guid.NewGuid().ToString();
+    leaseId = await container.AcquireLeaseAsync(leaseDuration, leaseIdGuid);
 
     // delete container will fail if a container is leased, unless the leaseId is provided
     // container.Properties.LeaseState, container.Properties.LeaseDuration, container.Properties.LeaseStatus
 
     // Break the lease. Passing null indicates that the break interval will be the remainder of the current lease.
     await container.BreakLeaseAsync(null);
+
+    await container.ReleaseLeaseAsync(new AccessCondition() { LeaseId = leaseIdGuid});
 
     // copy blob
     copyId = await destBlob.StartCopyAsync(sourceBlob);
@@ -660,10 +663,35 @@
     | az storage blob lease release | Releases the lease. |
     | az storage blob lease renew | Renews the lease. |
 
-    - 
+    ```cs
+    // Acquire lease for 15 seconds
+    string lease = blockBlob.AcquireLease(TimeSpan.FromSeconds(15), null);
+    Console.WriteLine("Blob lease acquired. Lease = {0}", lease);
+
+    // Update blob using lease. This operation will succeed
+    const string helloText = "Blob updated";
+    var accessCondition = AccessCondition.GenerateLeaseCondition(lease);
+    blockBlob.UploadText(helloText, accessCondition: accessCondition);
+    Console.WriteLine("Blob updated using an exclusive lease");
+
+    //Simulate third party update to blob without lease
+    try
+    {
+        // Below operation will fail as no valid lease provided
+        Console.WriteLine("Trying to update blob without valid lease");
+        blockBlob.UploadText("Update without lease, will fail");
+    }
+    catch (StorageException ex)
+    {
+        if (ex.RequestInformation.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed)
+            Console.WriteLine("Precondition failure as expected. Blob's lease does not match");
+        else
+            throw;
+    }
+    ```
 * implement data archiving and retention [Access tiers](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers), [Immutable blobs](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-immutable-storage)
     - access tier can be specified at account level and at blob level. *archive* tier can be applied only at the object level
-    - *Premium performance block blob storage*: data stored in SSD, ideal for cpaturing telemetry data, messaging, static web content, etc
+    - *Premium performance block blob storage*: data stored in SSD, ideal for capturing telemetry data, messaging, static web content, etc
     - *Blob rehydration*: changing archive tier to hot or cool in order to access the blob
     - Blob data cannot be read or modified while in the archive tier until rehydrated; only blob metadata read operations are supported while in archive.
     - Immutable storage for Azure Blob storage enables users to store business-critical data objects in a WORM (Write Once, Read Many) state. This state makes the data non-erasable and non-modifiable for a user-specified interval

@@ -16,7 +16,9 @@
 
     - Create App Service plan & Web app
     ```sh
-    az appservice plan create --name myAppServicePlan --resource-group myResourceGroup --sku FREE
+    az appservice plan create --name myAppServicePlanLinux --resource-group myResourceGroup --sku B1 --is-linux
+    az appservice plan create --name myAppServicePlanWin --resource-group myResourceGroup --sku FREE
+
 
     az webapp create --resource-group myResourceGroup --plan myAppServicePlan --name todoWebApp201908
     ```
@@ -28,7 +30,26 @@
     az webapp config appsettings set --name todoWebApp201908 --resource-group myResourceGroup --settings ASPNETCORE_ENVIRONMENT="Production"
     ```
 
-    - Publish ToDoList web app
+    - Deploy ToDoList web app (manually)
+    - Deploy from github
+    ```sh
+    az webapp deployment source config `
+    -n $appname `
+    -g $rg `
+    --repo-url $repourl `
+    --branch master `
+    --manual-integration
+
+    az webapp deployment source sync -n $appname -g $rg
+    ```
+    - Deploy container
+    ```sh
+    az webapp create `
+    -n $appname `
+    -g $rg `
+    --plan $planname `
+    --deployment-container-image-name $container 
+    ```
 
     - Stream diagnostics logs
     ```sh
@@ -46,12 +67,83 @@
 
 ## Create Azure App Service mobile apps (TODO)
 
-* add push notifications for mobile apps
-* enable offline sync for mobile app [Offline Data Sync in Azure Mobile Apps](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-offline-data-sync)
+* add push notifications for mobile apps [Android](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-android-get-started-push)
+    - The Mobile Apps feature of Azure App Service uses Azure Notification Hubs to send pushes, so you will be configuring a notification hub for your mobile app
+
+* enable offline sync for mobile app [Offline Data Sync in Azure Mobile Apps](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-offline-data-sync), [Windows](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-windows-store-dotnet-get-started-offline-data)
     - When your app is in offline mode, you can still create and modify data, which are saved to a local store. When the app is back online, it can synchronize local changes with your Azure Mobile App backend
     - A **local store** is the data persistence layer on the client device. The Azure Mobile Apps client SDKs provide a default local store implementation. On Windows, Xamarin and Android, it is based on SQLite. On iOS, it is based on Core Data.
     - To support offline use, your app should instead use the sync table APIs, such as *IMobileServiceSyncTable* (.NET client SDK) or *MSSyncTable* (iOS client). All the same CRUD operations (Create, Read, Update, Delete) work against sync table APIs, except now they read from or write to a local store.
     - When using sync tables, your client code controls when local changes are synchronized with an Azure Mobile App backend. Nothing is sent to the backend until there is a call to push local changes. Similarly, the local store is populated with new data only when there is a call to pull data
+
+    ```cs
+    const string applicationURL = @"https://mymobileapp.azurewebsites.net";
+    private MobileServiceClient client;
+    #if OFFLINE_SYNC_ENABLED
+        const string localDbPath    = "localstore.db";
+
+        private IMobileServiceSyncTable<ToDoItem> todoTable;
+    #else
+        private IMobileServiceTable<ToDoItem> todoTable;
+    #endif
+
+    // constructor
+    client = new MobileServiceClient(applicationURL);
+    #if OFFLINE_SYNC_ENABLED
+
+        // Initialize the store
+        InitializeStoreAsync().ContinueWith(_ =>
+        {
+
+            // Create an MSTable instance to allow us to work with the TodoItem table
+            todoTable = client.GetSyncTable<ToDoItem>();
+        });
+    #else
+        todoTable = client.GetTable<ToDoItem>();
+    #endif
+
+    public async Task InitializeStoreAsync()
+	{
+    #if OFFLINE_SYNC_ENABLED
+        try
+        {
+            var store = new MobileServiceSQLiteStore("localstore.db");
+            store.DefineTable<ToDoItem>();
+
+            // Uses the default conflict handler, which fails on conflict
+            // To use a different conflict handler, pass a parameter to InitializeAsync.
+            // For more details, see http://go.microsoft.com/fwlink/?LinkId=521416
+            await client.SyncContext.InitializeAsync(store);
+
+            store = null;
+        } catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    #endif
+    }
+
+    public async Task SyncAsync(bool pullData = false)
+    {
+    #if OFFLINE_SYNC_ENABLED
+        try
+        {
+            // changes across all tables are pushed to the backend. Only records with local changes are sent to the server
+            await client.SyncContext.PushAsync();
+
+            if (pullData) {
+                await todoTable.PullAsync("allTodoItems", todoTable.CreateQuery()); // query ID is used for incremental sync
+            }
+        }
+
+        catch (MobileServiceInvalidOperationException e)
+        {
+            Console.Error.WriteLine(@"Sync Failed: {0}", e.Message);
+        }
+    #endif
+    }
+    ```
+
 * implement a remote instrumentation strategy for mobile devices [Use TeamViewer to remotely administer Intune devices](https://docs.microsoft.com/en-ca/intune/teamviewer-support)
 
 
@@ -297,6 +389,37 @@
             log.LogInformation($"C# function processed: {myQueueItem}");
         }
         ```
+        - trigger and output to Table
+        ```cs
+        [FunctionName("ProcessOrders")]
+        public static void ProcessOrders(
+            [QueueTrigger("incoming-orders", 
+                        Connection = "AzureWebJobsStorage")]
+            CloudQueueMessage queueItem,
+            [Table("Orders", 
+                Connection = "AzureWebJobsStorage")]
+            ICollector<Order> tableBindings,
+            ILogger log)
+        {
+            log.LogInformation($"Processing Order (mesage Id): {queueItem.Id}");
+            log.LogInformation($"Queue Insertion Time: {queueItem.InsertionTime}");
+            log.LogInformation($"Queue Insertion Time: {queueItem.ExpirationTime}");
+            log.LogInformation($"Data: {queueItem.AsString}");
+            tableBindings.Add(JsonConvert.DeserializeObject<Order>(
+                queueItem.AsString));
+        }
+
+        [FunctionName("ProcessOrders-Poison")]
+        public static void ProcessFailedOrders(
+            [QueueTrigger("incoming-orders-poison", 
+                          Connection = "AzureWebJobsStorage")]
+            CloudQueueMessage queueItem, 
+            ILogger log)
+        {
+            log.LogInformation($"C# Queue trigger function processed: {queueItem}");
+            log.LogInformation($"Data: {queueItem.AsString}");
+        }
+        ```
         - output binding example
         ```cs
         [FunctionName("QueueOutput")]
@@ -307,6 +430,12 @@
             return input.Text;
         }
         ```
+        - Exception handling: if function throws, Azure functions runtime captures the exception and retries calling the function five times (including first call). After that the message is moved to *originalqueuename-poison* queue
+        - Concurrency / scaling:
+            - Azure Functions runtime will receive up to 16 messages and run functions for each in parallel
+            - When the number being processed gets down to 8, the runtime gets another batch of 16 and processes those.
+            - Any VM processing messages in the function app will only process a maximum of 24 parallel messages
+
     - [Timer](https://docs.microsoft.com/en-us/azure/azure-functions/functions-create-scheduled-function), [Timer Trigger](https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer)
         - trigger example
         ```cs
