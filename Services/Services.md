@@ -5,6 +5,40 @@
 * create a Logic App [Quickstart: Create your first automated workflow with Azure Logic Apps - Azure portal](https://docs.microsoft.com/en-us/azure/logic-apps/quickstart-create-first-logic-app-workflow)
     - Azure Logic Apps is a cloud service that helps you schedule, automate, and orchestrate tasks, business processes, and workflows when you need to integrate apps, data, systems, and services across enterprises or organizations.
     - Every logic app workflow starts with a trigger. Each time that the trigger fires, the Logic Apps engine creates a logic app instance that runs the actions in the workflow. These actions can also include data conversions and flow controls, such as conditional statements, switch statements, loops, and branching. 
+    - Actions that can fail (like put a message to a queue) can be retried by specifying a retry policy: Default, Exponential Interval, Fixed Interval, None.
+    ```json
+    "<action-name>": {
+    "type": "<action-type>", 
+    "inputs": {
+        "<action-specific-inputs>",
+        "retryPolicy": {
+            "type": "<retry-policy-type>",
+            "interval": "<retry-interval>",
+            "count": <retry-attempts>,
+            "minimumInterval": "<minimum-interval>",
+            "maximumInterval": "<maximun-interval>"
+        },
+        "<other-action-specific-inputs>"
+    },
+    "runAfter": {}
+    }
+    -----------------------------
+    "HTTP": {
+   "type": "Http",
+   "inputs": {
+      "method": "GET",
+      "uri": "http://myAPIendpoint/api/action",
+      "retryPolicy" : {
+         "type": "exponential",
+         "interval": "PT7S",
+         "count": 4,
+         "minimumInterval": "PT5S",
+         "maximumInterval": "PT1H"
+      }
+   },
+   "runAfter": {}
+    }
+    ```
 
 * create a custom connector for Logic Apps [Custom Connectors](https://docs.microsoft.com/en-ca/connectors/custom-connectors/)
     - A custom connector is a wrapper around a REST API. Once you have an API with authenticated access, you can use OpenAPI or Postman collection to describe the API
