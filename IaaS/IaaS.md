@@ -102,6 +102,84 @@
     az batch task file download --job-id myjob --task-id mytask1 --file-path stdout.txt --destination ./stdout-task1.txt
     ```
     - NET - [Parallel file processing](https://docs.microsoft.com/en-ca/azure/batch/tutorial-parallel-dotnet)
+    ```cs
+    BatchSharedKeyCredentials sharedKeyCredentials = new BatchSharedKeyCredentials(BatchAccountUrl, BatchAccountName, BatchAccountKey);
+
+    using (BatchClient batchClient = BatchClient.Open(sharedKeyCredentials))
+    {
+        // create pool
+         ImageReference imageReference = new ImageReference(
+                    publisher: "MicrosoftWindowsServer",
+                    offer: "WindowsServer",
+                    sku: "2012-R2-Datacenter-smalldisk",
+                    version: "latest");
+
+        VirtualMachineConfiguration virtualMachineConfiguration =
+            new VirtualMachineConfiguration(
+                imageReference: imageReference,
+                nodeAgentSkuId: "batch.node.windows amd64");
+
+        CloudPool pool = batchClient.PoolOperations.CreatePool(
+                    poolId: PoolId,
+                    virtualMachineSize: PoolVMSize,
+                    virtualMachineConfiguration: virtualMachineConfiguration,
+                    targetDedicatedComputeNodes: DedicatedNodeCount,
+                    targetLowPriorityComputeNodes: LowPriorityNodeCount);
+         pool.ApplicationPackageReferences = new List<ApplicationPackageReference>
+                {
+                    new ApplicationPackageReference
+                    {
+                        ApplicationId = appPackageId,
+                        Version = appPackageVersion
+                    }
+                };
+         await pool.CommitAsync();
+
+        // create job
+        CloudJob job = batchClient.JobOperations.CreateJob();
+        job.Id = jobId;
+        job.PoolInformation = new PoolInformation { PoolId = poolId };
+
+        await job.CommitAsync();
+
+        // add task
+         CloudTask task = new CloudTask(taskId, taskCommandLine);
+        task.ResourceFiles = new List<ResourceFile> { inputFiles[i] };
+        List<OutputFile> outputFileList = new List<OutputFile>();
+        OutputFileBlobContainerDestination outputContainer = new OutputFileBlobContainerDestination(outputContainerSasUrl);
+        OutputFile outputFile = new OutputFile(outputMediaFile,
+            new OutputFileDestination(outputContainer),
+            new OutputFileUploadOptions(OutputFileUploadCondition.TaskSuccess));
+        outputFileList.Add(outputFile);
+        task.OutputFiles = outputFileList;
+        await batchClient.JobOperations.AddTaskAsync(jobId, tasks);
+
+        // monitor task
+         ODATADetailLevel detail = new ODATADetailLevel(selectClause: "id");
+        List<CloudTask> addedTasks = await batchClient.JobOperations.ListTasks(jobId, detail).ToListAsync();
+
+        TaskStateMonitor taskStateMonitor = batchClient.Utilities.CreateTaskStateMonitor();
+        try
+        {
+            await taskStateMonitor.WhenAll(addedTasks, TaskState.Completed, timeout);
+        }
+        catch (TimeoutException)
+        {
+            await batchClient.JobOperations.TerminateJobAsync(jobId);
+            Console.WriteLine(incompleteMessage);
+            return false;
+        }
+        await batchClient.JobOperations.TerminateJobAsync(jobId);
+
+         detail.SelectClause = "executionInfo";
+        // Filter for tasks with 'Failure' result.
+        detail.FilterClause = "executionInfo/result eq 'Failure'";
+
+        List<CloudTask> failedTasks = await batchClient.JobOperations.ListTasks(jobId, detail).ToListAsync();
+
+    }
+
+    ```
 
 * write code to run an Azure Batch Services batch job [Github samples](https://github.com/Azure-Samples/azure-batch-samples)
 
@@ -143,6 +221,37 @@
     docker images
     docker run -d -p 8080:80 aci-tutorial-app
     docker ps
+    ```
+    - Example dot netmvc app
+    ```sh
+    // create and run asp.net core app
+    mkdir webapp
+    cd webapp
+    dotnet new mvc
+    dotnet build
+    dotnet run
+
+    // docker file example
+    FROM microsoft/dotnet:sdk AS build-env
+    WORKDIR /app
+
+    #copy csproj and restore
+    COPY webapp/*.csproj ./
+    RUN dotnet restore
+
+    # copy everthing else and build
+    COPY ./webapp ./
+    RUN dotnet publish -c Release -o out
+
+    # build runtime image
+    FROM microsoft/dotnet:aspnetcore-runtime
+    WORKDIR ./app
+    COPY --from=build-env /app/out .
+    ENTRYPOINT ["dotnet", "webapp.dll"]
+
+    // build container and run
+    docker build -t webapp .
+    docker run -d -p 8080:80 --name myapp webapp
     ```    
     
 * publish an image to the Azure Container Registry [ACI Tutorial](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-tutorial-prepare-acr)

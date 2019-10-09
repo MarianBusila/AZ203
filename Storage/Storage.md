@@ -38,9 +38,16 @@
     TableOperation insertOrMergeOperation = TableOperation.InsertOrMerge(entity);
     TableResult result = await table.ExecuteAsync(insertOrMergeOperation);
 
+    // insert batch
+    var batchOperation = new TableBatchOperation();
+    foreach( var entity in entities)
+        batchOperation.Insert(entity);
+    await table.ExecuteBatchAsync(batchOperation);
+
     // retrieve
     TableOperation retrieveOperation = TableOperation.Retrieve<CustomerEntity>(partitionKey, rowKey);
     TableResult result = await table.ExecuteAsync(retrieveOperation);
+    var ce = (CustomerEntity)result.Result;
 
     // delete
     TableOperation deleteOperation = TableOperation.Delete(deleteEntity);
@@ -55,7 +62,7 @@
             TableQuery.GenerateFilterCondition("Email", QueryComparisons.Equal,"Ben@contoso.com")
     ));
 
-    await table.ExecuteQuerySegmentedAsync<CustomerEntity>(query, null);
+    var results = await table.ExecuteQuerySegmentedAsync<CustomerEntity>(query, null);
     ```
 * implement partitioning schemes
     - in general there are 3 strategies for partitioning data
@@ -66,6 +73,40 @@
 ## Develop solutions that use Cosmos DB storage
 * create, read, update, and delete data by using appropriate APIs [.NET](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-api-get-started)
     - *Request Units* per second is a rate-based currency. It abstracts the system resources such as CPU, IOPS, and memory that are required to perform the database operations supported by Azure Cosmos DB
+    
+    ```sh
+    # Create a SQL API Cosmos DB account with session consistency and multi-master enabled
+    az cosmosdb create `
+    -g $resourceGroupName `
+    --name $accountName `
+    --kind GlobalDocumentDB `
+    --locations "West US=0" "North Central US=1" `
+    --default-consistency-level Strong `
+    --enable-multiple-write-locations true `
+    --enable-automatic-failover true
+
+    # Create a database
+    az cosmosdb database create `
+    -g $resourceGroupName `
+    --name $accountName `
+    --db-name $databaseName
+
+    # List account keys
+    az cosmosdb list-keys `
+    --name $accountName `
+    -g $resourceGroupName
+
+    # List account connection strings
+    az cosmosdb list-connection-strings `
+    --name $accountName `
+    -g $resourceGroupName
+
+    az cosmosdb show `
+    --name $accountName `
+    -g $resourceGroupName `
+    --query "documentEndpoint"
+    ```
+    - Example using CosmosClient which is the latest cosmos client (Microsoft.Azure.Cosmos)
     ```cs
     this.cosmosClient = new CosmosClient(EndpointUri, PrimaryKey);
     this.database = await this.cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId);
@@ -108,6 +149,63 @@
 
     ```
 
+    - Example using DocumentClient (Microsoft.Azure.Documents)
+    ```cs
+    DocumentClient _client = new DocumentClient(new Uri(_endpoint), _key);
+    await _client.CreateDatabaseIfNotExistsAsync(
+                new Database { Id = _databaseId });
+
+    await _client.CreateDocumentCollectionIfNotExistsAsync(
+        UriFactory.CreateDatabaseUri(_databaseId), 
+        new DocumentCollection { 
+            Id = _collectionId,
+            PartitionKey = new PartitionKeyDefinition() { 
+                Paths = new Collection<string>(new [] { "/id" })
+            }
+        });
+    
+    // insert item
+    try
+    {
+        await _client.ReadDocumentAsync(
+                        UriFactory.CreateDocumentUri(
+                            databaseId, collectionId, documentId),
+            new RequestOptions { 
+                PartitionKey = new PartitionKey(documentId) 
+            });
+        Console.WriteLine(
+            $"Family {documentId} already exists in the database");
+    }
+    catch (DocumentClientException de)
+    {
+        if (de.StatusCode == HttpStatusCode.NotFound)
+        {
+            await _client.CreateDocumentAsync(
+                UriFactory.CreateDocumentCollectionUri(
+                    databaseId, collectionId), 
+                data);
+            Console.WriteLine($"Created Family {documentId}");
+        }
+    }
+
+    // execute query
+    var queryOptions = new FeedOptions { 
+        MaxItemCount = -1, 
+        EnableCrossPartitionQuery = true };
+
+    var sql = "SELECT c.givenName FROM Families f JOIN c IN f.children WHERE f.id = 'WakefieldFamily' ORDER BY f.address.city ASC";
+    var sqlQuery = _client.CreateDocumentQuery<JObject>(
+            UriFactory.CreateDocumentCollectionUri(
+                databaseId, collectionId),
+            sql, queryOptions );
+
+    foreach (var result in sqlQuery)
+    {
+        Console.WriteLine(result);
+    }
+
+    ```
+
 * implement partitioning schemes [Partitioning in Azure Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/partitioning-overview), [Data partitioning strategies(by service)](https://docs.microsoft.com/en-us/azure/architecture/best-practices/data-partitioning-strategies#partitioning-cosmos-db)
     - Azure Cosmos DB transparently and automatically manages the placement of logical partitions on physical partitions to efficiently satisfy the scalability and performance needs of the container.
     - Azure Cosmos DB uses hash-based partitioning to spread logical partitions across physical partitions
@@ -127,7 +225,20 @@
     - *Bounded Staleness* - see all "old" writes, aka periodic snapshots, continuous consistency. The reads might lag behind writes by at most "K" versions (i.e., "updates") of an item or by "T" time interval
     - *Session* - see all writes performed by reader
     - *Consistent Prefix* - see initial sequence of writes. The reader gets a snapshot of the data that existed in a given point in time in the past.
-    - *Eventual* consistency - see subset if previous writes; eventually see all writes. A write performed by a client (in the primary copy of a data center) will eventually be replicated in a remote data center.       
+    - *Eventual* consistency - see subset if previous writes; eventually see all writes. A write performed by a client (in the primary copy of a data center) will eventually be replicated in a remote data center. 
+    - CAP Theorem
+    ```
+    Consistency:  Every read receives the most recent write or an error
+    Availability: Every request receives a non-error response - without the guarantee that it contains the most recent write
+    Partition tolerance: the system continues to operate despite an arbitrary number of messages being dropped or  delayed by the network between nodes
+    ```      
+    | Level | Overview | CAP | Uses |
+    |-------|-------|-------|-------|
+    |Strong Consistency|All writes are read immediatly by anyone. Everyone sees the same thing|C: Highest<br>A: Lowest<br>P: Lowest|Financial, inventory, scheduling|
+    |Bounded staleness|Trades off lag for ensuring reads return the most recent write. Lag can be specified in time or number of operations.|C: Consistent to a bound<br>A: Low<br>P: Low|Apps showing status, tracking, scores, tickers|
+    |Session|Default consistency in CosmosDB. All reads on the same session(connection) are consistent.|C: Strong for the session<br>A: High<br>P: Moderate|Social apps, fitness apps, shopping cart|
+    |Consistent prefix|Bounded staleness without lag / delay. You will read consistent data, but it may be an older version.|C: Low<br>A: High<br>P: Low|Social media (comments, likes), apps with updates like scores|
+    |Eventual consistency|Highest availability and performance, but no quarantee that a read withing any specific time, for anyone, sees the latest data. But it will eventually be consistent - no loss due to high availability.|C: Lowest<br>A: Highest<br>P: Highest|Non-ordered updates like reviews and ratings, aggregated status|
 
 * generic notes on CosmosDB
     - provisioned throughput can be set at the database level and will be shared between containers, or at container level
@@ -160,6 +271,7 @@
         FROM Families f
         WHERE f.id = "AndersenFamily"
 
+        // project family name and city
         SELECT {"Name":f.id, "City":f.address.city} AS Family
         FROM Families f
         WHERE f.address.city = f.address.state
