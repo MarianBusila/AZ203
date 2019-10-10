@@ -118,6 +118,7 @@
         - **Key** is the unique document identifier. It's always a string, and it is required.
         - **Filterable, Sortable, and Facetable** determine whether fields are used in a filter, sort, or faceted navigation structure.
         - **Searchable** means that a field is included in full text search. Strings are searchable. Numeric fields and Boolean fields are often marked as not searchable. 
+    - there is an admin key and a search key
     ```cs
     public partial class Hotel
     {
@@ -184,9 +185,18 @@
     SearchParameters parameters = new SearchParameters()
         {
             Filter = "Rating gt 4",
-            Select = new[] { "HotelName", "Rating" }
+            Select = new[] { "HotelName", "Rating" },
+            OrderBy = new[] { "lastRenovationDate desc" },
+            Top = 2
         };
     results = indexClient.Documents.Search<Hotel>("wifi", parameters);
+    foreach (SearchResult<Hotel> result in results)
+    {
+        Console.WriteLine(result.Document);
+    }
+
+    // there is also a SearchIndexClient that can be used for searching
+    // var indexClientForQuery = new SearchIndexClient( searchServiceName, "hotels", new SearchCredentials(queryApiKey));
     ```
     - REST API
     ```
@@ -272,6 +282,7 @@
 * define policies for APIs [API Management policy samples](https://docs.microsoft.com/en-us/azure/api-management/policy-samples), [API Management policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-policies),
 [How to set or edit Azure API Management policies](https://docs.microsoft.com/en-us/azure/api-management/set-edit-policies),
 [API Management access restriction policies](https://docs.microsoft.com/en-us/azure/api-management/api-management-access-restriction-policies)
+    - there are 3 types of policies:inbound, outbound and backend
     - Policies can be configured globally or at the scope of a Product, API, or Operation
     - Policy scopes are evaluated in the following order:
         1. Global scope
@@ -331,11 +342,48 @@
     ```sh
     az eventgrid topic create --name $topicname -l westus2 -g gridResourceGroup
 
+    # subscribe to a custom topic from above
     endpoint=https://$sitename.azurewebsites.net/api/updates
     az eventgrid event-subscription create \
     --source-resource-id "/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.EventGrid/topics/$topicname" 
     --name demoViewerSub 
     --endpoint $endpoint
+
+    # subscribe to Azure storage blob created (the topic is managed by Azure, no need to create it)
+    az eventgrid event-subscription create `
+    --source-resource-id  "/subscriptions/{SubID}/resourceGroups/{RG}/providers/Microsoft.Storage/storageaccounts/s1"
+    --name storagesubscription `
+    --endpoint-type WebHook `
+    --endpoint $viewerendpoint `
+    --included-event-types "Microsoft.Storage.BlobCreated" `
+    --subject-begins-with "/blobServices/default/containers/testcontainer/"
+    ```
+    -- sample response for event-subscription creation
+    ```json
+    {
+        "deadLetterDestination": null,
+        "destination": {
+            "endpointBaseUrl": "https://driveeventgridviewer.azurewebsites.net/api/updates",
+            "endpointType": "WebHook",
+            "endpointUrl": null
+        },
+        "filter": {
+            "includedEventTypes": [
+            "Microsoft.Storage.BlobCreated"
+            ],
+            "isSubjectCaseSensitive": null,
+            "subjectBeginsWith": "/blobServices/default/containers/testcontainer/",
+            "subjectEndsWith": ""
+        },
+        "name": "storagesubscription",
+        "resourceGroup": "eventgrid",
+        "retryPolicy": {
+            "eventTimeToLiveInMinutes": 1440,
+            "maxDeliveryAttempts": 30
+        },
+        "topic": "/subscriptions/e093556c-ddf9-46c5-8337-f08a2ad4cac9/resourceGroups/eventgrid/providers/microsoft.storage/storageaccounts/marian201909sa",
+        "type": "Microsoft.EventGrid/eventSubscriptions"
+    }
     ```
 
     ```cs
@@ -453,6 +501,13 @@
     # Create a Service Bus queue
     az servicebus queue create --resource-group $resourceGroupName --namespace-name $namespaceName --name BasicQueue
 
+    # Powershell command
+    New-AzureRmServiceBusQueue `
+    -ResourceGroupName servicebus `
+    -NamespaceName laaz203sb `
+    -name testqueue `
+    -EnablePartitioning $false
+
     # Get the connection string for the namespace
     connectionString=$(az servicebus namespace authorization-rule keys list --resource-group $resourceGroupName --namespace-name $namespaceName --name RootManageSharedAccessKey --query primaryConnectionString --output tsv)
     ```
@@ -533,6 +588,7 @@
     ```
 
     - the default behaviour for topic is bradcasting. Use topic filters to umplment patterns like partitioning (mutually exclusive), routing (not necessarily exclusive)
+    - Message class has properties like To, RelpyTo, ReplyToSessionId, MessageId, CorrelationId and SessionId for implementing patterns like simple request/reply, Multiplexing, etc. For example, set CorrelationId to the MessageId before sending the response to ReplyTo queue. Or set ReplyToSessionId to SessionId before sending the response to ReplyTo queue
 
 * implement solutions that use Azure Queue Storage queues [Get started with Azure Queue storage using .NET](https://docs.microsoft.com/en-us/azure/storage/queues/storage-dotnet-how-to-use-queues)
     ```cs
