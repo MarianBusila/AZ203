@@ -3,7 +3,8 @@
 ## Overview
 
 * Microsoft Azure Active Directory (Azure AD) includes features, like Azure Multi-Factor Authentication (Azure MFA) and Azure AD self-service password reset (SSPR)
-* 
+* Service Principals are identities in AAD. A SP can represent an application, service or Azure resource(such as a VM). They are similar to user account, but purely for non human based identity
+* When used as an identity for a service such asa  WebApplication or for a resource such as a VM, this is often reffered to as Managed Service Identity.
 
 ## Implement authentication
 
@@ -24,6 +25,13 @@
 
 * implement Managed Service Identity (MSI)/Service Principal authentication [Use the portal to create an Azure AD application and service principal that can access resources](https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal), [What is managed identities for Azure resources?]https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview)
     - Instead of creating a service principal, consider using managed identities for Azure resources for your application identity
+    ```sh
+    # enable MSI on web app (system assigned id)
+    $sysid = az webapp identity assign `
+    -g $webapprgname `
+    -n $webappname
+    $sysid
+    ```
     - in the Portal, **Azure Active Directory** -> **App registrations** -> **New registration**. After this step, you can assign a role to your application
     - managed identities can be used with various Azure services like: Azure Functions, ServiceBus, Event Hubs, etc
 
@@ -89,6 +97,28 @@
     to provide a user with the minimum required privileges
     - Know when not to use a SAS. Sometimes the risks associated with a particular operation against your storage account outweigh the benefits of using a SAS. For such operations, create a middle-tier service that writes to your storage account after performing business rule validation, authentication, and auditing
 
+    ```sh
+    # generate sas token
+    $sas = az storage blob generate-sas `
+    --account-name $stgacctname `
+    --account-key $stgacctkey `
+    --container-name $container `
+    --name bleu.jpg `
+    --permissions r `
+    --start $start `
+    --expiry $end
+    $sas
+
+    # retrieve url of the blob with the sas token appended
+    az storage blob url `
+    --account-name $stgacctname `
+    --account-key $stgacctkey `
+    --container-name $container `
+    --name bleu.jpg `
+    --sas $sas `
+    -o tsv
+    ```
+
 ## Implement secure data solutions
 
 * encrypt and decrypt data at rest and in transit [Azure data security and encryption best practices](https://docs.microsoft.com/en-ca/azure/security/fundamentals/data-encryption-best-practices)
@@ -97,6 +127,21 @@
     -  Apply disk encryption at rest. Azure Storage and Azure SQL Database encrypt data at rest by default.
     - use SSL/TLS protocols to exchange data across different locations
     - For data moving between your on-premises infrastructure and Azure, consider appropriate safeguards such as HTTPS or VPN
+    - SQL Database dynamic masking limits sensitive data by masking it from non-priveledged users. (for example masks some columns). The data remains unencrypted in the database, it just when it is exposed that it gets masked
+    ```ps
+    New-AzureRmSqlDatabaseDataMaskingRule `
+    -ResourceGroupName $rgName `
+    -ServerName $serverName `
+    -DatabaseName $dbName `
+    -SchemaName "dbo" `
+    -TableName "Users" `
+    -ColumnName "AccountCode" `
+    -MaskingFunction Text ` // Default, Text, Number, SocialSecurityNumber, CreditCardNumber, Email
+    -SuffixSize 2 ` // number of characters to not be masked at the end of string
+    -ReplacementString "xxxxxxxx"
+    ```
+    - Always Encrypted precents access to data by non-owners of the data. This is perfomed by encrypting specific columns of a table using a certificate. The certificate is best stored securely in Key Vault. It isuseful when you need to have non priviledged users administer a dtabase and be blocked fomr seeing data (which admins normally can). As and example, you may want to secure pins for and account from off-site admins, but have them accessible from a web app to verify. In the connection string set "Column Encryption Setting=true", add an identity to the web app and grant that app access to certificate in KeyVault.
+
 
 * create, read, update, and delete keys, secrets, and certificates by using the KeyVault API [Quickstart: Set and retrieve a secret from Azure Key Vault using Azure CLI](https://docs.microsoft.com/en-us/azure/key-vault/quick-create-cli)
     - Azure Key Vault is a cloud service that works as a secure secrets store. You can securely store keys, passwords, certificates.
@@ -123,6 +168,12 @@
         return (await authenticationContext.AcquireTokenAsync(resource, adCredential)).AccessToken;
     });
 
+    // another way of creating the client (this uses the current az login user)
+    var azureServiceTokenProvider1 = new AzureServiceTokenProvider();
+    var kvClient = new KeyVaultClient(
+        new KeyVaultClient.AuthenticationCallback(
+            azureServiceTokenProvider1.KeyVaultTokenCallback));
+
     
     await kvClient.SetSecretAsync($"{kvURL}", secretName, secretValue);
 
@@ -133,4 +184,22 @@
 
     var keyvaultSecret = await kvClient.GetSecretAsync($"{kvURL}", secretName).ConfigureAwait(false);
 
+    ```
+    - Secure access to storage account with MSI
+    ```cs
+    var azureServiceTokenProvider = new AzureServiceTokenProvider();
+    var tokenCredential = new TokenCredential(
+        await azureServiceTokenProvider
+            .GetAccessTokenAsync("https://storage.azure.com/"));
+    var storageCredentials = new StorageCredentials(tokenCredential);
+
+    var cloudStorageAccount = new CloudStorageAccount(
+        storageCredentials, 
+        useHttps: true, 
+        accountName: "laaz203rbacmsistg", 
+        endpointSuffix: "core.windows.net");
+    var cloudBlobClient = cloudStorageAccount.CreateCloudBlobClient();
+
+    var cref = cloudBlobClient.GetContainerReference("contribapp");
+    cref.CreateIfNotExists();
     ```
