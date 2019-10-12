@@ -7,9 +7,14 @@
     - Horizontal scaling, also called scaling out and in, means adding or removing instances of a resource. 
     - Azure Virtual Machines, Service Fabric, Azure AppService, Azure Cloud Services has built in autoscaling
     - Scaling can be performed on a schedule, or based on a runtime metric, such as CPU or memory usage. 
-    - custome scaling might be necessary based on business counters like number of orders, etc
+    - custom scaling might be necessary based on business counters like number of orders, etc
     - autoscalling takes time to provision resources. For examepl, for a peak that is short term, other solutions could be used like throttling.
     - patterns: [Competing Consumers](https://docs.microsoft.com/en-us/azure/architecture/patterns/competing-consumers), [Pipes and Filters](https://docs.microsoft.com/en-us/azure/architecture/patterns/pipes-and-filters), [Throttling](https://docs.microsoft.com/en-us/azure/architecture/patterns/throttling)
+    - Auto-scaling can be configured using Azure Monitor, which performs the heavy lifting of monitoring and scaling resources based upon rules you define for horizontal scaling (scale in and out).
+        - **Sources**: Current resource(app service, VM), Storage Queues, Service Bus Queue, ApplicationInsights
+        - **Metrics**: CPU, Memory, Disk Queue Len, Http Queue Len, Data In/Out
+    - When defining a rule for auto scaling specify time aggregations and statistic, operator (greater then, less than, ..), threshold and duration. Finally, give the operation: Increase/Decrease count or percentage,  change amount and cool down.
+
     
 * implement code that handles transient faults [Transient fault handling](https://docs.microsoft.com/en-us/azure/architecture/best-practices/transient-faults), [Retry guidance for Azure services](https://docs.microsoft.com/en-us/azure/architecture/best-practices/retry-service-specific)
     - Transient faults include the momentary loss of network connectivity to components and services, the temporary unavailability of a service, or timeouts that arise when a service is busy. These faults are often self-correcting, and if the action is repeated after a suitable delay it is likely to succeed.
@@ -30,7 +35,7 @@
 
 ## Integrate caching and content delivery within solutions
 
-* store and retrieve data in Azure Redis cache
+* store and retrieve data in Azure Redis cache [Quickstart: Use Azure Cache for Redis with a .NET Core app](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-dotnet-core-quickstart), [ASP.NET Session State Provider for Azure Cache for Redis](https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-aspnet-session-state-provider)
     ```cs
     private static Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
         {
@@ -49,7 +54,22 @@
     IDatabase cache = lazyConnection.Value.GetDatabase();
     cache.StringSet("Message", "Hello! The cache is working from a .NET console app!")
     cache.StringGet("Message");
+    ```
 
+    - for session state caching in ASP.NET: install nuget package *Microsoft.Web.RedisSessionStateProvider* which adds to web.config settings to point to your redis cache.
+
+    - for output caching in ASP.NET: install nuget package *Install-Package Microsoft.Web.RedisOutputCacheProvider* which adds to web.config the following section
+    ```xml
+    <caching>
+        <outputCache defaultProvider="MyRedisOutputCache">
+            <providers>
+            <add name="MyRedisOutputCache" type="Microsoft.Web.Redis.RedisOutputCacheProvider"
+                host=""
+                accessKey=""
+                ssl="true" />
+            </providers>
+        </outputCache>
+    </caching>
     ```
 
 * develop code to implement CDNs in solutions [What is Azure CDN?](https://docs.microsoft.com/en-us/azure/cdn/cdn-overview), [Getting started on managing CDN in .NET](https://github.com/Azure-Samples/cdn-dotnet-manage-cdn)
@@ -83,9 +103,14 @@
         - AzureInstanceMetadataTelemetryModule - Collects heart beats (which are send as custom metrics), about Azure VM environment where application is hosted.
         - EventCounterCollectionModule - Collects EventCounters.. This module is a new feature and is available in SDK Version 2.8.0-beta3 and higher.
     - *Telemetry channels* are responsible for buffering telemetry items and sending them to the Application Insights service, where they're stored for querying and analysis. The *Send(ITelemetry item)* method of a telemetry channel is called after all telemetry initializers and telemetry processors are called. So, any items dropped by a telemetry processor won't reach the channel. *InMemoryChannel* and *ServerTelemetryChannel* are built-in.
-    - *Sampling* is a feature in Azure Application Insights and it is the recommended way to reduce telemetry traffic and storage, while preserving a statistically correct analysis of application data. Sampling retains 1 in n records and discards the rest. For example, it might retain one in five events, a sampling rate of 20%. The sampling divisor n is reported in each record in the property *itemCount*. 
+    - *Sampling* is a feature in Azure Application Insights and it is the recommended way to reduce telemetry traffic and storage, while preserving a statistically correct analysis of application data. Adaptive Sampling retains 1 in n records and discards the rest. For example, it might retain one in five events, a sampling rate of 20%. The sampling divisor n is reported in each record in the property *itemCount*. Other types of sampling: fixed-rate sampling and ingestion sampling (all the telemetry is sent to ApplicationInsights server (no bandwidth saved), but it gets filtered on AppInsights (reduce storage))
     - *Telemetry Initializers* add properties to any telemetry sent from your app, including telemetry from the standard modules. For example, you could add calculated values or version numbers by which to filter the data in the portal. (ITelemetryInitializer)
     - *Telemetry Processors* gives you more direct control over what is included or excluded from the telemetry stream. You can use it in conjunction with Sampling, or separately. All telemetry goes through your processor, and you can choose to drop it from the stream, or add properties. (ITelemetryProcessor)
+    - Usage Analytics
+        - **Funnels**: Track progression of a user through a series of steps in your app
+        - **Impact**:  How do page load times and other properties influnce conversion rates
+        - **Retention**: How many users return and how often do they perform particular tasks of achive goals
+        - **User Flows**: Show how users navigate between pages and features (repeat actions)
     - Using ApplicationInsightsServiceOptions
     ```cs
     public void ConfigureServices(IServiceCollection services)
@@ -189,6 +214,28 @@
     | where CounterName == "Available MBytes" 
     | summarize avg(CounterValue) by bin(TimeGenerated, 1h) 
     ```
+
+    - enable application logging(filesystem) for a webapp
+    ```sh
+    az webapp log config -n $appName -g $resourceGroup --level information --application-logging true
+
+    # tail the logs
+    az webapp log tail -n $appName -g $resourceGroup
+    ```
+
+    ```cs
+     public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
+            WebHost.CreateDefaultBuilder(args)
+            .ConfigureLogging(logging =>
+            {
+                logging.AddAzureWebAppDiagnostics();
+            })
+            .UseStartup<Startup>();
+    }
+    ```
+
+    - to enable application logging to blob, create a storageaccount with a container. There are 2 app settings that are generated when enabling logging to blob (*DIAGNOSTICS_AZUREBLOBCONTAINERSASURL and DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS*)
+
 * implement Application Insights Web Test and Alerts [Monitor the availability of any website](https://docs.microsoft.com/en-us/azure/azure-monitor/app/monitor-web-app-availability), [Add availability test with PowerShell](https://docs.microsoft.com/en-us/azure/azure-monitor/app/powershell#add-an-availability-test)
     - in Azure Application Insights you can configure sending web requests to your application at regular intervals from points around the world.
     - the URL to be tested must be visible from the internet. If your URL is not visible from the public internet, you can choose to selectively open up your firewall to allow only the test transactions through
