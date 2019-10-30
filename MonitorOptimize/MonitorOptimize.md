@@ -32,6 +32,28 @@
     - To prevent continual retries for operations that continually fail, consider implementing the Circuit Breaker pattern. In this pattern, if the number of failures within a specified time window exceeds the threshold, requests are returned to the caller immediately as errors, without attempting to access the failed resource or service.
     - Consider if retrying the same operation may cause inconsistencies in data (idempotency)
     - some Azure services have retry mechanism in their clients (EventHubs, ServiceBus, Storage, CosmosDB, etc)
+    ```cs
+    // for SQL Connection
+    var connStr = "some database";
+    var _policy = RetryPolicy.Create < SqlAzureTransientErrorDetectionStrategy(
+        retryCount: 3,
+        retryInterval: TimeSpan.FromSeconds(5));
+
+    using (var conn = new ReliableSqlConnection(connStr, _policy))
+    {
+        // Do SQL stuff here.
+    }
+    ```
+    ```cs
+    // for EntityFramework
+    public class EFConfiguration : DbConfiguration
+{
+    public EFConfiguration()
+    {
+        AddExecutionStrategy(() => new SqlAzureExecutionStrategy());
+    }
+}
+    ```
 
 ## Integrate caching and content delivery within solutions
 
@@ -78,6 +100,10 @@
     - the endpoint name is a subdomain of azureedge.net and is included in the URL for delivering CDN content by default (for example, https://contoso.azureedge.net/photo.png). You can map a custom domain with a CDN endpoint by creating a CNAME DNS Record and associating the custom domain with the CDN endpoint.
     - application code has to be modified to access the CDN endpoint instead of the origin URL
     - you can preload assets in CDN endpoints for imediate availability
+    - Azure CDN offers the following caching behavior options:
+        - Ignore query strings (there is only one cached version of an asset regardless of the query string in the URL)
+        - Bypass caching for query strings
+        - Cache every unique URL (use it for caching versions of a file)
     
 * invalidate cache content (CDN or Redis) [Purge an Azure CDN endpoint](https://docs.microsoft.com/en-us/azure/cdn/cdn-purge-endpoint)
     - on CDN you can *Purge* the endpoint (Portal or API) or you can do versioning of files

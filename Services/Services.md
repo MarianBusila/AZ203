@@ -262,7 +262,7 @@
         
 * create an APIM instance [Create a new Azure API Management service instance](https://docs.microsoft.com/en-us/azure/api-management/get-started-create-service-instance)
     - after creating the APIM service, you can add an API using OpenAPI, WSDL, LogicApp, FunctionApp, etc. You can create a Product that can contain one or multiple APIs, you can mock API responses, you can protect your API by adding inbound (set rate limit per subscription) and outbound policies(remove headers from the reponse, replace string in  the body like the url of the backend), you can monitor the API be checking the Metrics and creating Alerts (for example for unauthorized access), you can add revisions and versions
-    - 
+    - Every API mist be part of a product before it can be consumed through APIM
 
 * configure authentication for APIs [Create subscriptions in Azure API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-howto-create-subscriptions),
 [How to secure APIs using client certificate authentication in API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-howto-mutual-certificates-for-clients)

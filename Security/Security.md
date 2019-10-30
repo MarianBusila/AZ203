@@ -181,8 +181,10 @@
     attributes.Expires = DateTime.UtcNow.AddDays(15);
     var secret = await client.UpdateSecretAsync(secretKeyIdentifier, null, attributes, null).ConfigureAwait(false);
 
-
+    string kvURL = "https://<your-unique-keyvault-name>.vault.azure.net/";
     var keyvaultSecret = await kvClient.GetSecretAsync($"{kvURL}", secretName).ConfigureAwait(false);
+    // or
+    var secret = await keyVaultClient.GetSecretAsync("https://<YourKeyVaultName>.vault.azure.net/secrets/AppSecret");
 
     ```
     - Secure access to storage account with MSI

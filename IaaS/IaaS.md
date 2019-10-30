@@ -43,6 +43,77 @@
         .\Deploy-AzTemplate.ps1 -ArtifactStagingDirectory .\bin\Debug\staging\ExampleAppDeploy -Location centralus -TemplateFile WebSite.json -TemplateParametersFile WebSite.parameters.json -UploadArtifacts -StorageAccountName <storage-account-name>
         ```
     - besides the resources provided by Visual studio, other azure resources can be added to Website.json file (like a Dashboard, etc)
+    - Example ARM template
+    ```json
+    {
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storagePrefix": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 11
+        },
+        "storageSKU": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Standard_ZRS",
+                "Premium_LRS",
+                "Premium_ZRS",
+                "Standard_GZRS",
+                "Standard_RAGZRS"
+            ]
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]"
+        }
+    },
+    "variables": {
+        "uniqueStorageName": "[concat(parameters('storagePrefix'), uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-04-01",
+            "name": "[variables('uniqueStorageName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('storageSKU')]"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "supportsHttpsTrafficOnly": true
+            }
+        }
+    ],
+    "outputs": {
+        "storageEndpoint": {
+            "type": "object",
+            "value": "[reference(variables('uniqueStorageName')).primaryEndpoints]"
+        }
+    }
+    }
+    ```
+    - Deploy template
+    ```
+    New-AzResourceGroupDeployment `
+    -Name addoutputs `
+    -ResourceGroupName myResourceGroup `
+    -TemplateFile $templateFile `
+    -storagePrefix "store" `
+    -storageSKU Standard_LRS
+
+    az group deployment create \
+    --name addoutputs \
+    --resource-group myResourceGroup \
+    --template-file $templateFile \
+    --parameters storagePrefix=store storageSKU=Standard_LRS
+    ```
 
 * configure Azure Disk Encryption for VMs([Windows](https://docs.microsoft.com/en-ca/azure/virtual-machines/windows/encrypt-disks), [Linux](https://docs.microsoft.com/en-ca/azure/virtual-machines/linux/encrypt-disks))
     - in order to encrypt a VM disk, the VM and the KeyVault must be in the same region

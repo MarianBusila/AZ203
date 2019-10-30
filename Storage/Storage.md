@@ -64,6 +64,11 @@
 
     var results = await table.ExecuteQuerySegmentedAsync<CustomerEntity>(query, null);
     ```
+    - query using REST API
+    ```
+    https://<mytableendpoint>/People(PartitionKey='Harp',RowKey='Walter') 
+    ```
+
 * implement partitioning schemes
     - in general there are 3 strategies for partitioning data
         - **Horizontal** (sharding). Each partition is known as a shard and holds a specific subset of the data, such as all the orders for a specific set of customers.
@@ -407,6 +412,10 @@
         }
     }
     ```
+    - CommandBehaviour enum ecample: SqlDataReader reader = command.ExecuteReader(CommandBehavior.SequentialAccess);
+        - SequenctialAcccess - handle rows that contain columns with large binary values
+        - SingleResult - The query returns a single result set.
+        - SingleRow - The query is expected to return a single row of the first result set
 
 ## Develop solutions that use blob storage
 * overview [Advanced C#](https://github.com/Azure-Samples/storage-blob-dotnet-getting-started/blob/master/BlobStorage/Advanced.cs)

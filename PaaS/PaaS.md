@@ -69,6 +69,7 @@
 
 * add push notifications for mobile apps [Android](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-android-get-started-push)
     - The Mobile Apps feature of Azure App Service uses Azure Notification Hubs to send pushes, so you will be configuring a notification hub for your mobile app
+    - in order to register a mobile app for push notifications, the app needs the URl of the mobile app backend (it does not need the url of the notification hub). The app registers for push notifications with MobileAppServices. When backend sends a notification, it sends it to its configured NotificationHub, which then forwards the notification to WNS (Windows Notification Services), which forwards it to the app.
 
 * enable offline sync for mobile app [Offline Data Sync in Azure Mobile Apps](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-offline-data-sync), [Windows](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-windows-store-dotnet-get-started-offline-data)
     - When your app is in offline mode, you can still create and modify data, which are saved to a local store. When the app is back online, it can synchronize local changes with your Azure Mobile App backend
@@ -487,8 +488,8 @@
             - turning on **Authentication/Authorization** for the function and select a provider like AAD, Facebook, etc.
             - use Azure API Management (APIM). The function can be configured to receive requests only from the IP address of the APIM instance.
         
-* implement Azure Durable Functions
-    - an *orchestration* function calls multiple *activity* functions
+* implement Azure Durable Functions [Durable Functions types and features (Azure Functions)](https://docs.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-types-features-overview)
+    - a *client* starts an *orchestration* function calls multiple *activity* functions
     ```cs
     [FunctionName("HelloWorld")]
     public static async Task<List<string>> RunOrchestrator(
@@ -527,6 +528,44 @@
     }
     ```
     - patterns: function chaining, fan out/fan in (call functions in parallel and aggregate the result), async HTTP API (coordinate the state of long running operations with external clients), monitor (more flexibility than timer trigger functions), human interaction
+    ```cs
+    // Fan in/ fan out
+    public static async Task<long> Run(DurableOrchestrationContext backupContext)
+    {
+        string[] files = await backupContext.CallActivityAsync<string[]>(
+        "E2_GetFileList",
+        rootDirectory);
+
+        var tasks = new Task<long>[files.Length];
+        for (int i = 0; i < files.Length; i++)
+        {
+            tasks[i] = backupContext.CallActivityAsync<long>(
+                "E2_CopyFileToBlob",
+                files[i]);
+        }
+
+        await Task.WhenAll(tasks);
+    }
+    ```
     - durable functions relies on Event sourcing, checkpointing, and replay to persist the state and to resume execution
     - The Durable Functions extension uses queues, tables, and blobs in Azure Storage to persist execution history state and trigger function execution
 * create Azure Function apps by using Visual Studio
+    -function proxy example
+    ```json
+    {
+        "$schema": "http://json.schemastore.org/proxies",
+        "proxies": {
+            "proxy1": {
+                "matchCondition": {
+                    "methods": [ "GET" ],
+                    "route": "/api/{test}"
+                },
+                "backendUri": "https://<AnotherApp>.azurewebsites.net/api/<FunctionName>",
+                "requestOverrides": {
+                    "backend.request.headers.Accept": "application/xml",
+                    "backend.request.headers.x-functions-key": "%ANOTHERAPP_API_KEY%"
+                }
+            }
+        }
+    }
+    ```
