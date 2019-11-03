@@ -47,12 +47,12 @@
     ```cs
     // for EntityFramework
     public class EFConfiguration : DbConfiguration
-{
-    public EFConfiguration()
     {
-        AddExecutionStrategy(() => new SqlAzureExecutionStrategy());
+        public EFConfiguration()
+        {
+            AddExecutionStrategy(() => new SqlAzureExecutionStrategy());
+        }
     }
-}
     ```
 
 ## Integrate caching and content delivery within solutions

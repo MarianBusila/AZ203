@@ -277,6 +277,9 @@
     ```
 * create container images for solutions [ACI Tutorial](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-tutorial-prepare-app)
     - Azure Container Instances enables deployment of Docker containers onto Azure infrastructure without provisioning any virtual machines or adopting a higher-level service.
+    - RUN executes command(s) in a new layer and creates a new image. E.g., it is often used for installing software packages.
+    - CMD sets default command and/or parameters, which can be overwritten from command line when docker container runs.
+    - ENTRYPOINT configures a container that will run as an executable.
     - Dockerfile
     ```docker
     FROM node:8.9.3-alpine
@@ -348,7 +351,7 @@
     az acr repository show-tags --name myazurecontainerregistry2019 --repository aci-tutorial-app --output table
     ```
 
-* run containers by using Azure Container Instance or AKS [ACI Tutorial]()
+* run containers by using Azure Container Instance or AKS [ACI Tutorial](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-tutorial-prepare-app)
     - Create and configure an Azure AD service principal with pull permissions to your registry
     ```sh
     #!/bin/bash

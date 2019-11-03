@@ -328,6 +328,59 @@
 
     // The quota policy enforces a renewable or lifetime call volume and/or bandwidth quota, on a per subscription basis. When the call limit is reached, the caller receives a 403 Forbidden response status code
     <quota calls="10000" bandwidth="40000" renewal-period="3600" />
+
+    //validate JWT
+    // simple token validation
+    <validate-jwt header-name="Authorization" require-scheme="Bearer">
+        <issuer-signing-keys>
+            <key>{{jwt-signing-key}}</key>  <!-- signing key specified as a named value -->
+        </issuer-signing-keys>
+        <audiences>
+            <audience>@(context.Request.OriginalUrl.Host)</audience>  <!-- audience is set to API Management host name -->
+        </audiences>
+        <issuers>
+            <issuer>http://contoso.com/</issuer>
+        </issuers>
+    </validate-jwt>
+
+    // Azure Active Directory token validation
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized. Access token is missing or invalid.">
+        <openid-config url="https://login.microsoftonline.com/contoso.onmicrosoft.com/.well-known/openid-configuration" />
+        <audiences>
+            <audience>25eef6e4-c905-4a07-8eb4-0d08d5df8b3f</audience>
+        </audiences>
+        <required-claims>
+            <claim name="id" match="all">
+                <value>insert claim here</value>
+            </claim>
+        </required-claims>
+    </validate-jwt>
+
+    // Authorize access to operations based on token claims
+    <validate-jwt header-name="Authorization" require-scheme="Bearer" output-token-variable-name="jwt">
+        <issuer-signing-keys>
+            <key>{{jwt-signing-key}}</key> <!-- signing key is stored in a named value -->
+        </issuer-signing-keys>
+        <audiences>
+            <audience>@(context.Request.OriginalUrl.Host)</audience>
+        </audiences>
+        <issuers>
+            <issuer>contoso.com</issuer>
+        </issuers>
+        <required-claims>
+            <claim name="group" match="any">
+                <value>finance</value>
+                <value>logistics</value>
+            </claim>
+        </required-claims>
+    </validate-jwt>
+    <choose>
+        <when condition="@(context.Request.Method == "POST" && !((Jwt)context.Variables["jwt"]).Claims["group"].Contains("finance"))">
+            <return-response>
+                <set-status code="403" reason="Forbidden" />
+            </return-response>
+        </when>
+    </choose>
     ```
 ## Develop event-based solutions
 

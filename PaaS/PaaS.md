@@ -62,10 +62,23 @@
     - web jobs are build as console applications and deployed in an App Service
     - web jobs can have triggers as azure functions (timer, queue ,etc). They can also be run manually. They can also be long running processes (continuous)
     - you can publish multiple web jobs to a single web app.
+    ```cs
+     var builder = new HostBuilder();
+     builder.ConfigureWebJobs(b =>
+            {
+                b.AddAzureStorageCoreServices();
+            });
+    var host = builder.Build();
+    using (host)
+    {
+        host.Run();
+    }
+
+    ```
 
 * enable diagnostics logging [Azure App Service diagnostics overview](https://docs.microsoft.com/en-us/azure/app-service/overview-diagnostics)
 
-## Create Azure App Service mobile apps (TODO)
+## Create Azure App Service mobile apps
 
 * add push notifications for mobile apps [Android](https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-android-get-started-push)
     - The Mobile Apps feature of Azure App Service uses Azure Notification Hubs to send pushes, so you will be configuring a notification hub for your mobile app
@@ -489,8 +502,22 @@
             - use Azure API Management (APIM). The function can be configured to receive requests only from the IP address of the APIM instance.
         
 * implement Azure Durable Functions [Durable Functions types and features (Azure Functions)](https://docs.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-types-features-overview)
-    - a *client* starts an *orchestration* function calls multiple *activity* functions
+    - a *client* starts an *orchestration* function which calls multiple *activity* functions
     ```cs
+    [FunctionName("HelloWorld_HttpStart")]
+    public static async Task<HttpResponseMessage> HttpStart(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")]HttpRequestMessage req,
+        [OrchestrationClient]DurableOrchestrationClient starter,
+        ILogger log)
+    {
+        // Function input comes from the request content.
+        string instanceId = await starter.StartNewAsync("HelloWorld", null);
+
+        log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
+
+        return starter.CreateCheckStatusResponse(req, instanceId);
+    }
+    
     [FunctionName("HelloWorld")]
     public static async Task<List<string>> RunOrchestrator(
         [OrchestrationTrigger] DurableOrchestrationContext context)
@@ -511,21 +538,7 @@
     {
         log.LogInformation($"Saying hello to {name}.");
         return $"Hello {name}!";
-    }
-
-    [FunctionName("HelloWorld_HttpStart")]
-    public static async Task<HttpResponseMessage> HttpStart(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")]HttpRequestMessage req,
-        [OrchestrationClient]DurableOrchestrationClient starter,
-        ILogger log)
-    {
-        // Function input comes from the request content.
-        string instanceId = await starter.StartNewAsync("HelloWorld", null);
-
-        log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
-
-        return starter.CreateCheckStatusResponse(req, instanceId);
-    }
+    }    
     ```
     - patterns: function chaining, fan out/fan in (call functions in parallel and aggregate the result), async HTTP API (coordinate the state of long running operations with external clients), monitor (more flexibility than timer trigger functions), human interaction
     ```cs
