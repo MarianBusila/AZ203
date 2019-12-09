@@ -46,7 +46,7 @@
     - [Create a custom connector from an OpenAPI definition](https://docs.microsoft.com/en-ca/connectors/custom-connectors/define-openapi-definition)
     - [Use a webhook as a trigger for Azure Logic Apps ](https://docs.microsoft.com/en-ca/connectors/custom-connectors/create-webhook-trigger#create-webhook-triggers-from-the-ui)
 
-* create a custom template for Logic Apps [Overview: Automate deployment for Azure Logic Apps by using Azure Resource Manager templates] (https://docs.microsoft.com/en-ca/azure/logic-apps/logic-apps-azure-resource-manager-templates-overview)
+* create a custom template for Logic Apps [Overview: Automate deployment for Azure Logic Apps by using Azure Resource Manager templates](https://docs.microsoft.com/en-ca/azure/logic-apps/logic-apps-azure-resource-manager-templates-overview)
     - a Resource Manager template structure
     ```json
     {
